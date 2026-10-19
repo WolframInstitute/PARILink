@@ -6,10 +6,6 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, edited, ready_for_review]
   workflow_dispatch:
-  workflow_call:
-    secrets:
-      WOLFRAMSCRIPT_ENTITLEMENTID:
-        required: true
 
 permissions:
   contents: read
@@ -83,21 +79,6 @@ jobs:
           python3 -m py_compile tests/upstream/prepare.py
           make test-hooks
 
-      - name: Validate release tag
-        if: github.event_name == 'push' && github.ref_type == 'tag'
-        env:
-          TAG: ${{ github.ref_name }}
-        run: |
-          version=$(sed -n 's/^[[:space:]]*"Version" -> "\([^"]*\)",/\1/p' PARILink/PacletInfo.wl)
-          if [[ ! "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || [ "$TAG" != "v$version" ]; then
-            echo '::error title=Release tag::Use vX.Y.Z matching PARILink/PacletInfo.wl.'
-            exit 1
-          fi
-          git merge-base --is-ancestor HEAD origin/main || {
-            echo '::error title=Release commit::Release tags must point to a commit on main.'
-            exit 1
-          }
-
   paclet:
     name: Paclet (GP ${{ matrix.gp }})
     needs: [commits, repository]
@@ -119,10 +100,11 @@ jobs:
       GP_POSTSCRIPT_VIEWER: /usr/bin/true
     steps:
       # Git must exist before checkout, so PacletPage can record the commit.
-      - name: Install Git
+      - name: Install runtime tools
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends git ca-certificates curl
+          apt-get install -y --no-install-recommends \
+            git ca-certificates curl make libgmp10 python3 unzip zstd
           git config --system --add safe.directory "$GITHUB_WORKSPACE"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -135,25 +117,46 @@ jobs:
             echo '::error title=Missing license::Set WOLFRAMSCRIPT_ENTITLEMENTID; see CONTRIBUTING.md.'
             exit 1
           fi
-          wolframscript -code 'Print["Wolfram Engine ", $Version]'
 
       - uses: ./.github/actions/setup-pari
         with:
           version: ${{ matrix.gp }}
 
-      - name: Run source checks and tests
-        run: make all test-pari
-
-      - name: Build with PacletPage without cloud writes
+      - name: Cache pinned documentation tools
         if: matrix.gp == '2.19.0'
-        run: make deps build
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .deps/PacletPage
+            .deps/MarkdownToNotebook
+            .deps/WolframParser
+          key: tools-${{ runner.os }}-${{ runner.arch }}-wl15-${{ hashFiles('scripts/fetch-deps.sh') }}
+
+      - name: Cache PacletPage intermediates
+        if: matrix.gp == '2.19.0'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            PARILink/build/cache
+            PARILink/build/incremental
+            PARILink/build/build-context.txt
+            PARILink/build/WolframInstitute__PARILink/Documentation
+          key: pages-${{ runner.os }}-${{ runner.arch }}-wl15-${{ hashFiles('scripts/project.wls', 'scripts/fetch-deps.sh', '.github/actions/setup-pari/action.yml') }}-${{ hashFiles('PARILink/PacletInfo.wl', 'PARILink/Kernel/**', 'PARILink/Resources/**', 'docs/en/**', 'docs/ResourceDefinition.md') }}
+          restore-keys: |
+            pages-${{ runner.os }}-${{ runner.arch }}-wl15-${{ hashFiles('scripts/project.wls', 'scripts/fetch-deps.sh', '.github/actions/setup-pari/action.yml') }}-
+
+      - name: Check, test, and build in one kernel
+        env:
+          TARGET: ${{ matrix.gp == '2.19.0' && 'ci-build' || 'ci' }}
+        run: make "$TARGET"
 
       - name: Preserve the verified archive and documentation
         if: matrix.gp == '2.19.0'
         run: |
           mkdir -p build/release
           cp PARILink/build/*.paclet build/release/
-          tar -czf build/release/pacletpage-build.tar.gz -C PARILink \
+          tar --exclude=build/cache --exclude=build/incremental \
+            -czf build/release/pacletpage-build.tar.gz -C PARILink \
             Documentation ResourceDefinition.nb build
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

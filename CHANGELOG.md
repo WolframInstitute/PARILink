@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Add CI for both GP versions and publish verified PacletPage builds only from release tags.
+- Reuse CI artifacts for releases, cache GP and build tools, and build unchanged documentation incrementally.
 - Require scoped commit subjects and validate pull request titles and new commits in CI.
 - Prevent user variables and closures from capturing GP bridge state.
 - Support multiline scripts and inline declarations with GP's script parser.

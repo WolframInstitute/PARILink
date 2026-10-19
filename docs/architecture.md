@@ -44,8 +44,13 @@ without exposing the process protocol to callers.
 - Use one project script for checks and tests. PacletPage builds the markdown
   documentation, checks the archive, and provides the publishing entry point.
   Building and publishing are separate actions; builds must remain offline.
-- Run CI on pushes and pull requests. Release tags rerun the checks before
-  PacletPage publishes the verified archive and documentation. Only a `vX.Y.Z`
+- Cache intermediate documentation with PacletPage. Runtime, source, guide,
+  and tooling changes invalidate it; every build still creates and load-checks
+  a fresh archive. CI caches GP and the pinned tools and uses one main kernel
+  per tested GP version.
+- Run CI on pushes and pull requests. Release tags use the successful `main`
+  build for the same commit before PacletPage publishes its archive and
+  documentation, without rebuilding. Only a `vX.Y.Z`
   tag matching the paclet version and a clean commit on `main` can publish.
   GitHub receives the same archive and a checksum after the site checks pass.
 

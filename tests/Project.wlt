@@ -1,5 +1,29 @@
 (* Build and release checks run without cloud credentials or GP. *)
 
+VerificationTest[
+	Module[{directory = CreateDirectory[], files, fingerprint, runtime = {"2.19.0", "gp-binary-hash"}, changed},
+		files = FileNameJoin[Prepend[#, directory]] & /@ {
+			{"PARILink", "Kernel", "Test.wl"}, {"PARILink", "Resources", "startup.gp"},
+			{"docs", "en", "Guides", "Test.md"}, {"docs", "en", "Symbols", "Test.md"}
+		};
+		WithCleanup[
+			Scan[(CreateDirectory[DirectoryName[#], CreateIntermediateDirectories -> True]; Export[#, "original", "Text"]) &, files],
+			Block[{root = directory, pacletDirectory = FileNameJoin[{directory, "PARILink"}], docsDirectory = FileNameJoin[{directory, "docs", "en"}]},
+				fingerprint = buildFingerprint[runtime];
+				changed = Map[Function[file,
+					Export[file, "changed", "Text"];
+					With[{different = buildFingerprint[runtime] =!= fingerprint}, Export[file, "original", "Text"]; different]
+				], files];
+				Join[changed, {buildFingerprint[{"2.17.4", "gp-binary-hash"}] =!= fingerprint,
+					buildFingerprint[{"2.19.0", "rebuilt-gp-binary"}] =!= fingerprint}]
+			],
+			DeleteDirectory[directory, DeleteContents -> True]
+		]
+	],
+	{True, True, True, False, True, True},
+	TestID -> "Build: invalidate caches for code, resources, guides, and GP; track symbol pages individually"
+]
+
 releaseEnvironment = <|
 	"GITHUB_ACTIONS" -> "true", "GITHUB_EVENT_NAME" -> "push", "GITHUB_REF_TYPE" -> "tag",
 	"GITHUB_REF_NAME" -> "v0.1.0", "GITHUB_REF" -> "refs/tags/v0.1.0"

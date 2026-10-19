@@ -3,7 +3,7 @@ PARILINK_GP ?= gp
 UPSTREAM_OUTPUT ?= build/upstream
 
 .DEFAULT_GOAL := help
-.PHONY: help all check test test-hooks test-pari test-upstream deps docs build check-release publish hooks
+.PHONY: help all check test test-hooks test-pari test-upstream ci ci-build deps docs build check-release publish hooks
 
 help:
 	@printf '  make %-12s %s\n' \
@@ -11,6 +11,8 @@ help:
 		test-hooks 'check the commit-message policy' \
 		test-pari 'integration tests with an installed GP' \
 		test-upstream 'compare a local PARI_SOURCE release with GP (see docs/compatibility.md)' \
+		ci 'source checks and all tests in one Wolfram kernel' \
+		ci-build 'CI checks, tests, and PacletPage build in one Wolfram kernel' \
 		hooks 'enable the repository Git hooks' \
 		deps 'fetch pinned documentation tools' \
 		docs 'build documentation using PacletPage' \
@@ -18,9 +20,10 @@ help:
 		check-release 'verify a release-tag checkout in GitHub Actions' \
 		publish 'publish the verified archive from a release-tag workflow'
 
-all: hooks test-hooks
+all ci ci-build: hooks test-hooks
+ci-build: deps
 
-all check test test-pari docs build check-release publish:
+all check test test-pari ci ci-build docs build check-release publish:
 	$(WOLFRAMSCRIPT) -file scripts/project.wls $@
 
 test-hooks:

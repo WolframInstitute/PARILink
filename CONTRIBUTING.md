@@ -98,13 +98,29 @@ and generates notebooks. `make build` also creates the archive in
 offline dry-run mode after the dependencies are available. Generated notebooks,
 caches, and archives are ignored by Git.
 
+PacletPage reuses unchanged pages and rebuilds edited pages. Changes to the GP
+binary, Wolfram version, kernel, resources, guide navigation, or build tools
+invalidate the cache. Removed pages are pruned. Every build still packs a fresh
+archive and checks that it loads; only intermediate pages are cached.
+
+For all checks and the build in one Wolfram kernel:
+
+```bash
+make ci-build
+```
+
 ## Continuous integration
 
 [CI](.github/workflows/ci.yml) checks commit messages and repository hygiene on
-pushes to `main` and pull requests. The Wolfram Engine 15.0 jobs run `make all`
-and `make test-pari` with GP 2.17.4 and 2.19.0 on Linux. PacletPage builds the
+pushes to `main` and pull requests. The Wolfram Engine 15.0 jobs run source
+checks and both test suites with GP 2.17.4 and 2.19.0 on Linux. PacletPage builds the
 documentation and paclet with GP 2.19.0, checks every page is present, and loads
 the archive in a fresh kernel. Plot viewers are disabled throughout CI.
+
+CI caches compiled GP executables, pinned documentation tools, and PacletPage's
+intermediate pages. Cache hits skip GP compilation and dependency fetches.
+Checks, tests, and the build share one main kernel per GP version; archive
+checks keep their isolated kernels. Tests always run, including on cache hits.
 
 The Wolfram jobs need an on-demand license entitlement. PacletPage's child
 kernels use `wolframscript` to obtain their licenses, as in Ruliology. Store
@@ -132,8 +148,10 @@ Use squash merges with the pull request title as the commit subject.
 
 [Release](.github/workflows/release.yml) runs only when a `vX.Y.Z` tag is pushed.
 The tag must match `PARILink/PacletInfo.wl` and point to a commit on `main`.
-It reruns CI for that commit, then publishes the verified archive and
-documentation through PacletPage. PacletPage checks the archive and source
+It finds the `main` CI run for that exact commit and waits for it to pass, then
+publishes its verified archive and documentation through PacletPage. No tests,
+GP compilation, or documentation builds are repeated during release.
+PacletPage checks the archive and source
 hashes before deployment. The GitHub release receives the same `.paclet` and
 its SHA-256 checksum after the published site's checks pass.
 
@@ -164,6 +182,8 @@ git push origin v0.1.0
 `make publish` is the workflow's entry point. It refuses local runs, branch
 pushes, manual workflow runs, mismatched tags, and modified checkouts. To retry
 a failed release, rerun the original tag workflow; do not move an existing tag.
+Build artifacts are retained for 30 days. If one has expired, rerun the original
+`main` push CI run before retrying the release.
 PacletPage refuses to replace a published version from a different commit.
 
 The paclet requires an existing GP installation. CI does not bundle GP or

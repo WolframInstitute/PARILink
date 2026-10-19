@@ -7,7 +7,15 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Restore compiled GP
+      id: cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: .deps/pari-runtime/${{ inputs.version }}
+        key: pari-${{ runner.os }}-${{ runner.arch }}-${{ inputs.version }}-${{ hashFiles('.github/actions/setup-pari/action.yml', '.github/workflows/ci.yml') }}
+
     - name: Build PARI/GP
+      if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
       env:
         PARI_VERSION: ${{ inputs.version }}
@@ -17,8 +25,7 @@ runs:
           2.19.0) checksum=f317b9722eb5d9094a60303774f066f3a83e3ec1f170be8546c44d7583f30b6d ;;
           *) echo 'Unsupported PARI release' >&2; exit 1 ;;
         esac
-        apt-get update
-        apt-get install -y --no-install-recommends build-essential libgmp-dev python3 unzip
+        apt-get install -y --no-install-recommends build-essential libgmp-dev
         work="$RUNNER_TEMP/pari-$PARI_VERSION"
         mkdir -p "$work"
         cd "$work"
@@ -29,4 +36,14 @@ runs:
         cd "pari-$PARI_VERSION"
         ./Configure --static --without-readline --mt=pthread --graphic=svg
         make -j2 gp
-        echo "PARILINK_GP=$PWD/gp" >> "$GITHUB_ENV"
+        mkdir -p "$GITHUB_WORKSPACE/.deps/pari-runtime/$PARI_VERSION"
+        cp gp "$GITHUB_WORKSPACE/.deps/pari-runtime/$PARI_VERSION/gp"
+
+    - name: Verify GP and expose its path
+      shell: bash
+      env:
+        PARI_VERSION: ${{ inputs.version }}
+      run: |
+        executable="$GITHUB_WORKSPACE/.deps/pari-runtime/$PARI_VERSION/gp"
+        test "$("$executable" --version-short)" = "$PARI_VERSION"
+        echo "PARILINK_GP=$executable" >> "$GITHUB_ENV"

@@ -48,7 +48,7 @@ loadPublishing[] := Module[{page, parser, converter},
 	Needs["WolframInstitute`PacletPage`"];
 	{
 		"Source" -> docsDirectory, "Definition" -> FileNameJoin[{root, "docs", "ResourceDefinition.md"}],
-		"Converter" -> converter, "Dependencies" -> {parser}, "Parallel" -> False, "TimeConstraint" -> 180
+		"Converter" -> converter, "Dependencies" -> {parser}, "Parallel" -> False, "TimeConstraint" -> 180, "Prune" -> True
 	}
 ]
 
@@ -86,15 +86,48 @@ checkArchive[result_] := (
 	Print[result["Resource"]["Archive"]];
 )
 
-build[] := Module[{options = loadPublishing[], result},
+(* PacletPage tracks each page. Reset its caches when external inputs or guide
+   navigation change; its own code hash does not include GP or Resources/. *)
+buildFingerprint[runtime_] := Module[{files},
+	files = Sort @ Select[Join[
+		FileNameJoin[{root, "scripts", #}] & /@ {"project.wls", "fetch-deps.sh"},
+		{FileNameJoin[{pacletDirectory, "PacletInfo.wl"}]},
+		Flatten[FileNames["*", #, Infinity] & /@ {
+			FileNameJoin[{pacletDirectory, "Kernel"}], FileNameJoin[{pacletDirectory, "Resources"}],
+			FileNameJoin[{docsDirectory, "Guides"}]
+		}]
+	], FileType[#] === File &];
+	Hash[{$Version, $SystemID, runtime,
+		{FileNameDrop[#, Length[FileNameSplit[root]]], FileHash[#, "SHA256", "HexString"]} & /@ files
+	}, "SHA256", "HexString"]
+]
+
+prepareBuild[] := Module[{session, runtime, fingerprint, stamp, incremental, cache},
+	loadSource[];
+	session = WolframInstitute`PARILink`StartPARISession[];
+	require[! FailureQ[session], "GP is required to evaluate documentation examples"];
+	runtime = WithCleanup[Null,
+		{session["Version"], FileHash[session["Executable"], "SHA256", "HexString"]},
+		DeleteObject[session]
+	];
+	fingerprint = buildFingerprint[runtime];
+	stamp = FileNameJoin[{pacletDirectory, "build", "build-context.txt"}];
+	incremental = FileExistsQ[stamp] && StringTrim[ReadString[stamp]] === fingerprint;
+	cache = FileNameJoin[{pacletDirectory, "build", "cache"}];
+	If[! incremental && DirectoryQ[cache], DeleteDirectory[cache, DeleteContents -> True]];
+	<|"Fingerprint" -> fingerprint, "Stamp" -> stamp, "Incremental" -> incremental|>
+]
+
+build[] := Module[{options = loadPublishing[], context = prepareBuild[], result},
 	result = Block[{$CloudConnected = False},
 		pageCall["PublishPacletPage", pacletDirectory, "PARILink", "DryRun" -> True,
-			"BuildOptions" -> options, "ResourceOptions" -> {"Parallel" -> False}, "Monitor" -> True]
+			"BuildOptions" -> options, "ResourceOptions" -> {"Parallel" -> False, "Incremental" -> context["Incremental"]}, "Monitor" -> True]
 	];
 	require[AssociationQ[result], "PacletPage build failed"];
 	require[Lookup[result["Build"], "Failed", None] === {} && Lookup[result["Build"], "Unevaluated", None] === <||>,
 		"Documentation pages failed to build or evaluate"];
 	checkArchive[result];
+	Export[context["Stamp"], context["Fingerprint"], "Text"];
 ]
 
 releaseTag[environment_Association, version_String] := Module[{tag = Lookup[environment, "GITHUB_REF_NAME", ""]},
@@ -152,7 +185,9 @@ Exit @ Catch[
 		"check", check[],
 		"test", runTests[False],
 		"test-pari", runTests[True],
+		"ci" | "ci-build", check[]; runTests[False]; runTests[True]; If[command === "ci-build", build[]],
 		"docs", With[{options = loadPublishing[]},
+			prepareBuild[];
 			result = pageCall["BuildPacletDocumentation", pacletDirectory, Sequence @@ options];
 			require[AssociationQ[result] && Lookup[result, "Failed", None] === {}, "Documentation build failed"];
 			Print[result]

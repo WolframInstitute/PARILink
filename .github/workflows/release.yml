@@ -5,6 +5,7 @@ on:
     tags: ['v[0-9]+.[0-9]+.[0-9]+']
 
 permissions:
+  actions: read
   contents: read
 
 # Every version updates the same cloud site; do not overlap deployments.
@@ -14,10 +15,43 @@ concurrency:
 
 jobs:
   verify:
-    name: Verify tagged source
-    uses: ./.github/workflows/ci.yml
-    secrets:
-      WOLFRAMSCRIPT_ENTITLEMENTID: ${{ secrets.WOLFRAMSCRIPT_ENTITLEMENTID }}
+    name: Find the verified build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    outputs:
+      run: ${{ steps.ci.outputs.run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate the tag and require successful CI for its commit
+        id: ci
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          version=$(sed -n 's/^[[:space:]]*"Version" -> "\([^"]*\)",/\1/p' PARILink/PacletInfo.wl)
+          if [[ ! "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || [ "$TAG" != "v$version" ]; then
+            echo '::error title=Release tag::Use vX.Y.Z matching PARILink/PacletInfo.wl.'
+            exit 1
+          fi
+          git merge-base --is-ancestor HEAD origin/main || {
+            echo '::error title=Release commit::Release tags must point to a commit on main.'
+            exit 1
+          }
+          commit=$(git rev-parse HEAD)
+          run=$(gh run list --workflow ci.yml --branch main --commit "$commit" \
+            --event push --limit 1 --json databaseId --jq '.[0].databaseId')
+          if [ -z "$run" ]; then
+            echo '::error title=Missing CI run::Push the release commit to main and let CI run before tagging.'
+            exit 1
+          fi
+          gh run watch "$run" --exit-status --interval 30
+          test "$(gh run view "$run" --json conclusion --jq .conclusion)" = success
+          echo "run=$run" >> "$GITHUB_OUTPUT"
 
   publish:
     name: Publish with PacletPage
@@ -49,10 +83,10 @@ jobs:
             fi
           done
 
-      - name: Install Git
+      - name: Install publishing tools
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends git ca-certificates curl
+          apt-get install -y --no-install-recommends git ca-certificates curl make unzip zstd
           git config --system --add safe.directory "$GITHUB_WORKSPACE"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -60,14 +94,21 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-pari
-        with:
-          version: '2.19.0'
-
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: PARILink-verified
           path: build/release
+          run-id: ${{ needs.verify.outputs.run }}
+          github-token: ${{ github.token }}
+
+      - name: Restore pinned documentation tools
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .deps/PacletPage
+            .deps/MarkdownToNotebook
+            .deps/WolframParser
+          key: tools-${{ runner.os }}-${{ runner.arch }}-wl15-${{ hashFiles('scripts/fetch-deps.sh') }}
 
       - name: Restore the verified PacletPage build
         run: |
@@ -83,16 +124,19 @@ jobs:
 
   release:
     name: Publish GitHub release
-    needs: publish
+    needs: [verify, publish]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
+      actions: read
       contents: write
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: PARILink-verified
           path: dist
+          run-id: ${{ needs.verify.outputs.run }}
+          github-token: ${{ github.token }}
 
       - name: Attach the verified paclet and checksum
         env:
