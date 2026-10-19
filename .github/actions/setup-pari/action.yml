@@ -1,0 +1,32 @@
+name: Set up PARI/GP
+description: Build a verified PARI release for the integration tests and examples.
+inputs:
+  version:
+    description: PARI release to build
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Build PARI/GP
+      shell: bash
+      env:
+        PARI_VERSION: ${{ inputs.version }}
+      run: |
+        case "$PARI_VERSION" in
+          2.17.4) checksum=02651d99c391007d384b3fadbc20abc6916b77036f9e496c99e9ce8688ca4b53 ;;
+          2.19.0) checksum=f317b9722eb5d9094a60303774f066f3a83e3ec1f170be8546c44d7583f30b6d ;;
+          *) echo 'Unsupported PARI release' >&2; exit 1 ;;
+        esac
+        apt-get update
+        apt-get install -y --no-install-recommends build-essential libgmp-dev python3 unzip
+        work="$RUNNER_TEMP/pari-$PARI_VERSION"
+        mkdir -p "$work"
+        cd "$work"
+        curl --fail --location --retry 3 \
+          "https://pari.math.u-bordeaux.fr/pub/pari/unix/pari-$PARI_VERSION.tar.gz" -o pari.tar.gz
+        printf '%s  pari.tar.gz\n' "$checksum" | sha256sum --check
+        tar -xzf pari.tar.gz
+        cd "pari-$PARI_VERSION"
+        ./Configure --static --without-readline --mt=pthread --graphic=svg
+        make -j2 gp
+        echo "PARILINK_GP=$PWD/gp" >> "$GITHUB_ENV"

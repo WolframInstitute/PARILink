@@ -44,6 +44,10 @@ without exposing the process protocol to callers.
 - Use one project script for checks and tests. PacletPage builds the markdown
   documentation, checks the archive, and provides the publishing entry point.
   Building and publishing are separate actions; builds must remain offline.
+- Run CI on pushes and pull requests. Release tags rerun the checks before
+  PacletPage publishes the verified archive and documentation. Only a `vX.Y.Z`
+  tag matching the paclet version and a clean commit on `main` can publish.
+  GitHub receives the same archive and a checksum after the site checks pass.
 
 ## Scope and verification
 

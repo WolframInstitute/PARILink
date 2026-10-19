@@ -1,0 +1,113 @@
+name: Release
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: read
+
+# Every version updates the same cloud site; do not overlap deployments.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify tagged source
+    uses: ./.github/workflows/ci.yml
+    secrets:
+      WOLFRAMSCRIPT_ENTITLEMENTID: ${{ secrets.WOLFRAMSCRIPT_ENTITLEMENTID }}
+
+  publish:
+    name: Publish with PacletPage
+    needs: verify
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    container:
+      image: wolframresearch/wolframengine:15.0
+      options: --user root
+    defaults:
+      run:
+        shell: bash
+    env:
+      WOLFRAMSCRIPT_ENTITLEMENTID: ${{ secrets.WOLFRAMSCRIPT_ENTITLEMENTID }}
+      QT_QPA_PLATFORM: offscreen
+      GP_SVG_VIEWER: /usr/bin/true
+      GP_POSTSCRIPT_VIEWER: /usr/bin/true
+    steps:
+      - name: Check publishing credentials
+        env:
+          WOLFRAM_CLOUD_USER: ${{ secrets.WOLFRAM_CLOUD_USER }}
+          WOLFRAM_CLOUD_PASSWORD: ${{ secrets.WOLFRAM_CLOUD_PASSWORD }}
+        run: |
+          for name in WOLFRAMSCRIPT_ENTITLEMENTID WOLFRAM_CLOUD_USER WOLFRAM_CLOUD_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error title=Missing credential::$name is not set; see CONTRIBUTING.md."
+              exit 1
+            fi
+          done
+
+      - name: Install Git
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates curl
+          git config --system --add safe.directory "$GITHUB_WORKSPACE"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-pari
+        with:
+          version: '2.19.0'
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: PARILink-verified
+          path: build/release
+
+      - name: Restore the verified PacletPage build
+        run: |
+          tar -xzf build/release/pacletpage-build.tar.gz -C PARILink
+          cmp build/release/*.paclet PARILink/build/*.paclet
+          make deps
+
+      - name: Publish the resource and documentation site
+        env:
+          WOLFRAM_CLOUD_USER: ${{ secrets.WOLFRAM_CLOUD_USER }}
+          WOLFRAM_CLOUD_PASSWORD: ${{ secrets.WOLFRAM_CLOUD_PASSWORD }}
+        run: make publish
+
+  release:
+    name: Publish GitHub release
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: PARILink-verified
+          path: dist
+
+      - name: Attach the verified paclet and checksum
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          cd dist
+          archive="WolframInstitute__PARILink-${TAG#v}.paclet"
+          test -f "$archive"
+          sha256sum "$archive" > "$archive.sha256"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$archive" "$archive.sha256" --clobber
+          else
+            gh release create "$TAG" "$archive" "$archive.sha256" \
+              --title "$TAG" --generate-notes --verify-tag
+          fi

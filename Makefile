@@ -3,21 +3,28 @@ PARILINK_GP ?= gp
 UPSTREAM_OUTPUT ?= build/upstream
 
 .DEFAULT_GOAL := help
-.PHONY: help all check test test-pari test-upstream deps docs build publish hooks
+.PHONY: help all check test test-hooks test-pari test-upstream deps docs build check-release publish hooks
 
 help:
 	@printf '  make %-12s %s\n' \
 		all 'source checks and tests without GP' \
+		test-hooks 'check the commit-message policy' \
 		test-pari 'integration tests with an installed GP' \
 		test-upstream 'compare a local PARI_SOURCE release with GP (see docs/compatibility.md)' \
 		hooks 'enable the repository Git hooks' \
 		deps 'fetch pinned documentation tools' \
 		docs 'build documentation using PacletPage' \
 		build 'build and check the paclet locally using PacletPage' \
-		publish 'publish using PARILINK_PUBLISH_ACCOUNT'
+		check-release 'verify a release-tag checkout in GitHub Actions' \
+		publish 'publish the verified archive from a release-tag workflow'
 
-all check test test-pari docs build publish:
+all: hooks test-hooks
+
+all check test test-pari docs build check-release publish:
 	$(WOLFRAMSCRIPT) -file scripts/project.wls $@
+
+test-hooks:
+	python3 -m unittest discover -s tests -p 'test_*.py'
 
 test-upstream:
 	python3 tests/upstream/prepare.py "$(PARI_SOURCE)" "$(PARILINK_GP)" \

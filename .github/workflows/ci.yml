@@ -1,0 +1,166 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+  workflow_dispatch:
+  workflow_call:
+    secrets:
+      WOLFRAMSCRIPT_ENTITLEMENTID:
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  commits:
+    name: Commit messages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check commit subjects and the pull request title
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          status=0
+          check() {
+            printf '%s\n' "$2" > "$RUNNER_TEMP/message"
+            if ! .githooks/commit-msg "$RUNNER_TEMP/message"; then
+              echo "::error title=Commit convention::$1 must use type(scope): description, at most 72 characters."
+              status=1
+            fi
+          }
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            check 'Pull request title' "$TITLE"
+          fi
+          revisions=("$HEAD")
+          if [ -n "$BASE" ] && [ "$BASE" != 0000000000000000000000000000000000000000 ]; then
+            revisions+=("^$BASE")
+          fi
+          # Keep history from before this policy was introduced intact.
+          policy=$(git log --diff-filter=A --format=%H -- .github/workflows/ci.yml | tail -1)
+          if git rev-parse --verify "$policy^" >/dev/null 2>&1; then
+            revisions+=("^$policy^")
+          fi
+          git log --format='%H %s' "${revisions[@]}" > "$RUNNER_TEMP/commits"
+          while IFS= read -r line; do
+            check "Commit ${line%% *}" "${line#* }"
+          done < "$RUNNER_TEMP/commits"
+          exit "$status"
+
+  repository:
+    name: Repository checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check sources and hooks
+        run: |
+          git diff --check "$(git hash-object -t tree /dev/null)" HEAD
+          sh -n .githooks/commit-msg
+          bash -n scripts/fetch-deps.sh
+          python3 -m py_compile tests/upstream/prepare.py
+          make test-hooks
+
+      - name: Validate release tag
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(sed -n 's/^[[:space:]]*"Version" -> "\([^"]*\)",/\1/p' PARILink/PacletInfo.wl)
+          if [[ ! "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || [ "$TAG" != "v$version" ]; then
+            echo '::error title=Release tag::Use vX.Y.Z matching PARILink/PacletInfo.wl.'
+            exit 1
+          fi
+          git merge-base --is-ancestor HEAD origin/main || {
+            echo '::error title=Release commit::Release tags must point to a commit on main.'
+            exit 1
+          }
+
+  paclet:
+    name: Paclet (GP ${{ matrix.gp }})
+    needs: [commits, repository]
+    # Forks have no entitlement; their repository and commit checks still run.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        gp: ['2.17.4', '2.19.0']
+    container:
+      image: wolframresearch/wolframengine:15.0
+      options: --user root
+    env:
+      WOLFRAMSCRIPT_ENTITLEMENTID: ${{ secrets.WOLFRAMSCRIPT_ENTITLEMENTID }}
+      QT_QPA_PLATFORM: offscreen
+      GP_SVG_VIEWER: /usr/bin/true
+      GP_POSTSCRIPT_VIEWER: /usr/bin/true
+    steps:
+      # Git must exist before checkout, so PacletPage can record the commit.
+      - name: Install Git
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates curl
+          git config --system --add safe.directory "$GITHUB_WORKSPACE"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Check Wolfram Engine license
+        run: |
+          if [ -z "${WOLFRAMSCRIPT_ENTITLEMENTID:-}" ]; then
+            echo '::error title=Missing license::Set WOLFRAMSCRIPT_ENTITLEMENTID; see CONTRIBUTING.md.'
+            exit 1
+          fi
+          wolframscript -code 'Print["Wolfram Engine ", $Version]'
+
+      - uses: ./.github/actions/setup-pari
+        with:
+          version: ${{ matrix.gp }}
+
+      - name: Run source checks and tests
+        run: make all test-pari
+
+      - name: Build with PacletPage without cloud writes
+        if: matrix.gp == '2.19.0'
+        run: make deps build
+
+      - name: Preserve the verified archive and documentation
+        if: matrix.gp == '2.19.0'
+        run: |
+          mkdir -p build/release
+          cp PARILink/build/*.paclet build/release/
+          tar -czf build/release/pacletpage-build.tar.gz -C PARILink \
+            Documentation ResourceDefinition.nb build
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: matrix.gp == '2.19.0'
+        with:
+          name: PARILink-verified
+          path: build/release/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
