@@ -10,4 +10,5 @@
 - Keep tests requiring GP separate from tests that do not need it.
 - Use tabs in Wolfram Language, short public usage messages, and plain prose.
 - Use PacletPage for documentation and publishing, without a second release pipeline.
+- Use Conventional Commits with a subject of at most 72 characters. Keep each commit focused and include tests with behavior changes.
 - Run `make all` and `make test-pari` for behavior changes. Update `CHANGELOG.md`.
