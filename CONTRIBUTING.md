@@ -7,8 +7,8 @@
 - Git, Bash, and `make`
 - PARI/GP 2.17 or later for integration tests and documentation examples
 
-GP is not needed for `make all` or `make test`. Live verification currently
-covers macOS on Apple silicon with GP 2.17.4.
+GP is not needed for `make all` or `make test`. See the
+[compatibility report](docs/compatibility.md) for verified versions and platforms.
 
 ## Project rules
 
@@ -41,6 +41,10 @@ PARILINK_GP=/path/to/gp make test-pari
 Tests in `PARILink/Tests/` need no GP. Tests in `Tests/Integration/` use a real
 executable. Cover successful calls, failures, and process cleanup. Close every
 session created by tests and examples.
+
+`make test-upstream` compares expressions from a local PARI source release with
+native GP. It needs Python 3 and a matching GP executable; the
+[compatibility report](docs/compatibility.md#reproduce-the-sweep) describes setup.
 
 ## Style
 

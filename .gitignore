@@ -7,3 +7,4 @@ PARILink/ResourceDefinition.nb
 *.paclet
 *.mx
 .env
+__pycache__/

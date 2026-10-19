@@ -10,6 +10,7 @@
 - Enforce request deadlines even when a kernel timer is delayed.
 - Add `StackLimit` at session startup and allow parallel worker stacks to grow.
 - Expand integration coverage across GP types and mathematical function families.
+- Add a reproducible comparison against PARI's upstream regression suites.
 
 ## 0.1.0
 
