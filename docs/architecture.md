@@ -19,6 +19,11 @@ without exposing the process protocol to callers.
   User startup code must not change the link's protocol or produce side effects.
 - Keep one process per session. Objects belong to that session and Wolfram
   kernel. Closing or losing a session invalidates its objects.
+- Evaluate user code at top level so its variables and closures do not capture
+  bridge locals. Retained objects occupy reusable list slots, which also allow
+  GP functions to update them by reference. Mutable lists and maps stay objects.
+- Read requests through GP's script parser; `eval` mishandles inline declarations.
+  Each request uses a temporary UTF-8 file, removed after completion or failure.
 - Transfer integers and fractions as decimal strings, and text as UTF-8 bytes
   inside JSON. Decode with `ImportString` and `FromDigits`, never `ToExpression`.
 - Convert exact complex numbers, vectors, and matrices recursively. Copying
@@ -43,7 +48,8 @@ without exposing the process protocol to callers.
 ## Scope and verification
 
 The initial target is PARI/GP 2.17 or newer with Wolfram Language 15 or newer.
-Live tests use GP 2.17.4 on macOS ARM64. Linux and Windows are not yet verified.
+Live tests use GP 2.17.4 and 2.19.0 on macOS ARM64.
+Linux and Windows are not yet verified.
 No platform bundles or public download URLs are claimed by this source release.
 
 The initial number-theory examples cover factorization, quadratic class

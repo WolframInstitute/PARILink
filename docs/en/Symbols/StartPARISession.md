@@ -22,6 +22,9 @@ RelatedGuides: [PARILink]
 - With `"Executable" -> Automatic`, `PARILINK_GP` takes precedence over the
   executable search path and common macOS installation locations.
 - `TimeConstraint -> 30` limits the startup handshake in seconds.
+- `"StackLimit" -> 256 * 1024^2` sets the maximum stack size in bytes for GP's
+  main thread and each parallel worker. It must be an integer of at least 8 MiB.
+  Use a larger value for memory-intensive work.
 - Startup ignores `.gprc`, disables terminal colors, and disables GP's break loop.
 - Close a session with `DeleteObject[session]` to release its process and objects.
 - Startup and option errors return a `Failure`.

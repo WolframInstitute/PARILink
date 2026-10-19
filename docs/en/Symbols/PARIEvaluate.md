@@ -16,6 +16,7 @@ RelatedGuides: [PARILink]
 ## Details & Options
 
 - *code* is GP source, not Wolfram Language source.
+- Multiline code follows GP's script syntax. The last expression supplies the result.
 - Definitions and GP settings persist in the session.
 - This executes code with the GP process's permissions. Use `PARICall` to
   transfer data arguments without interpolating them into source code.

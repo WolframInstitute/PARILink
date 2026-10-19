@@ -29,7 +29,7 @@ pariObjectData[_] := pariFailure["PARIInvalidObject", "This PARI object is not v
 
 pariObjectArgument[session_, object_PARIObject] := pariEnclose @ With[{data = Confirm @ pariObjectData[object]},
 	If[data["Session"] === session,
-		"mapget(parilinkobjects," <> IntegerString[data["ID"]] <> ")",
+		"parilinkobjects[" <> IntegerString[data["ID"]] <> "]",
 		pariFailure["PARIInvalidObject", "A PARI object can only be used in its own session."]
 	]
 ]
@@ -48,7 +48,7 @@ PARIObject /: Normal[object_PARIObject] := pariObjectValue[object, "Copy"]
 
 PARIObject /: DeleteObject[object : PARIObject[key_String]] := pariEnclose @ With[{data = Confirm @ pariObjectData[object]},
 	{result = Confirm @ pariOutput[pariRequest[data["Session"],
-		"mapdelete(parilinkobjects," <> IntegerString[data["ID"]] <> ");0", "Automatic", 30], "Discard"]},
+		"parilinkrelease(" <> IntegerString[data["ID"]] <> ")", "Automatic", 30], "Discard"]},
 	$pariObjects = KeyDrop[$pariObjects, key];
 	Null
 ]

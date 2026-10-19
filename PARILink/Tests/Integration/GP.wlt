@@ -35,8 +35,8 @@ VerificationTest[
 ]
 
 VerificationTest[
-	PARIEvaluate[session, "[Vecsmall([1,2]),List([3,4]),[5,6]~,matrix(0,0)]"],
-	{{1, 2}, {3, 4}, {5, 6}, {}}, TestID -> "container-types"
+	PARIEvaluate[session, "[Vecsmall([1,2]),[5,6]~,matrix(0,0)]"],
+	{{1, 2}, {5, 6}, {}}, TestID -> "container-types"
 ]
 
 VerificationTest[

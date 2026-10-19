@@ -25,6 +25,10 @@ RelatedGuides: [PARILink]
 - `TimeConstraint -> 30` bounds an evaluation in seconds; `Infinity` removes it.
 - `"ReturnType" -> Automatic` copies exact supported values. `"Object"` retains
   the entire result in GP; `"String"` returns its GP display text.
+- Use `"ReturnType" -> "Object"` for matrices and GP structures that will be
+  passed to another GP function, including number fields and elliptic curves.
+- GP lists and maps remain mutable `PARIObject` values. Use `Vec` or `Mat`
+  explicitly to copy their contents.
 - `"Output" -> "Print"` forwards GP output. `"Capture"` returns `"Result"`,
   `"StandardOutput"`, and `"StandardError"`; `"Discard"` returns only the result.
 - Errors return `Failure`. In capture mode, GP errors also contain the captured output.

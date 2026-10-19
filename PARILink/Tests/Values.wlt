@@ -22,7 +22,8 @@ VerificationTest[
 
 VerificationTest[
 	And @@ (MatchQ[StartPARISession[#], Failure["PARIInvalidOption", _]] & /@
-		{"Typo" -> 1, "Executable" -> 42, TimeConstraint -> -1, TimeConstraint -> 1 + I}),
+		{"Typo" -> 1, "Executable" -> 42, "StackLimit" -> 0, "StackLimit" -> 8 * 1024^2 - 1,
+			"StackLimit" -> 1024.^3, "StackLimit" -> Infinity, TimeConstraint -> -1, TimeConstraint -> 1 + I}),
 	True, TestID -> "start-option-validation"
 ]
 

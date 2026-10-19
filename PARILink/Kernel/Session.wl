@@ -12,14 +12,17 @@ PARISession::usage = "PARISession[...] represents a PARI/GP session. session[\"p
 
 $pariSessions = <||>
 
-Options[StartPARISession] = {"Executable" -> Automatic, TimeConstraint -> 30}
+Options[StartPARISession] = {"Executable" -> Automatic, "StackLimit" -> 256 * 1024^2, TimeConstraint -> 30}
 
-StartPARISession[opts : OptionsPattern[]] := pariEnclose @ Module[{executable, process, session, version, time},
+StartPARISession[opts : OptionsPattern[]] := pariEnclose @ Module[{executable, process, session, version, time, stackLimit},
 	Confirm @ pariCheckOptions[StartPARISession, {opts}];
 	time = OptionValue[TimeConstraint];
 	ConfirmBy[time, pariTimeQ, pariFailure["PARIInvalidOption", "TimeConstraint must be positive or Infinity."]];
+	stackLimit = OptionValue["StackLimit"];
+	ConfirmAssert[IntegerQ[stackLimit] && stackLimit >= 8 * 1024^2,
+		pariFailure["PARIInvalidOption", "StackLimit must be an integer of at least 8 MiB, in bytes."]];
 	executable = Confirm @ pariFindExecutable[OptionValue["Executable"]];
-	process = Confirm @ pariStartProcess[executable];
+	process = Confirm @ pariStartProcess[executable, stackLimit];
 	session = PARISession[CreateUUID[]];
 	AssociateTo[$pariSessions, First[session] -> <|"Process" -> process, "Executable" -> executable, "Status" -> "Ready"|>];
 	version = CheckAbort[pariOutput[pariRequest[session, "version()", "Automatic", time], "Discard"],
@@ -62,6 +65,7 @@ pariRequest[session : PARISession[id_String], code_String, mode_String, time_] :
 		AssociateTo[$pariSessions, id -> state];
 		result = Replace[response["Payload"], {
 			{"ok", value_} :> pariDecode[session, value],
+			{"incomplete"} :> pariFailure["PARIInterrupted", "GP ended the request without returning a result. The session was stopped."],
 			{"error", kind_, message_} :> pariEnclose @ With[{
 				name = Confirm @ pariDecode[session, kind], text = Confirm @ pariDecode[session, message]
 			}, If[StringQ[name] && StringQ[text],
@@ -70,7 +74,7 @@ pariRequest[session : PARISession[id_String], code_String, mode_String, time_] :
 			]],
 			_ :> pariFailure["PARIProtocolError", "PARI/GP returned an invalid response."]
 		}];
-		If[MatchQ[result, Failure["PARIProtocolError", _]], pariCloseSession[session, "Stopped"]];
+		If[MatchQ[result, Failure["PARIProtocolError" | "PARIInterrupted", _]], pariCloseSession[session, "Stopped"]];
 		<|"Result" -> result, "StandardOutput" -> response["StandardOutput"], "StandardError" -> response["StandardError"]|>
 	]
 ]

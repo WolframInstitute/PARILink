@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Prevent user variables and closures from capturing GP bridge state.
+- Support multiline scripts and inline declarations with GP's script parser.
+- Support in-place operations on retained values and reuse released storage.
+- Retain mutable GP lists and maps; copy their contents explicitly with `Vec` or `Mat`.
+- Stop sessions promptly when GP abandons a request without returning a result.
+- Enforce request deadlines even when a kernel timer is delayed.
+- Add `StackLimit` at session startup and allow parallel worker stacks to grow.
+- Expand integration coverage across GP types and mathematical function families.
+
 ## 0.1.0
 
 - Add explicit PARI/GP sessions and structured function evaluation.

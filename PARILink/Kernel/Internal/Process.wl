@@ -25,12 +25,13 @@ pariFindExecutable[Automatic] := With[{
 
 pariFindExecutable[_] := pariFailure["PARIInvalidOption", "Executable must be Automatic or a file path."]
 
-pariStartProcess[executable_String] := With[{
+pariStartProcess[executable_String, stackLimit_Integer] := With[{
 	startup = PacletObject["WolframInstitute/PARILink"]["AssetLocation", "GPStartup"]
 }, If[StringQ[startup] && FileExistsQ[startup],
 	Replace[Quiet @ Check[StartProcess[{
 		executable, "-f", "-q", "--default", "colors=no", "--default", "breakloop=0",
-		"--default", "parisizemax=268435456", startup
+		"--default", "parisizemax=" <> IntegerString[stackLimit],
+		"--default", "threadsizemax=" <> IntegerString[stackLimit], startup
 	}], $Failed], Except[_ProcessObject] :> pariFailure["PARIStartFailed", "The GP process could not be started."]],
 	pariFailure["PARIStartFailed", "The PARILink startup file is missing."]
 ]]
@@ -44,12 +45,17 @@ pariRead[process_, channel_] := Replace[
 	Quiet @ Check[ReadString[ProcessConnection[process, channel], EndOfBuffer], ""], Except[_String] -> ""
 ]
 
-pariWait[process_ProcessObject, marker_String] := Module[{
+pariWait[process_ProcessObject, marker_String, deadline_] := Module[{
 	out = {}, err = {}, outSize = 0, errSize = 0, newOut, newErr,
 	prefix = "\n" <> marker, tail = "", framed = False, parts = {}, fragment,
 	start, finish, outputSize, payload, result, done = False
 },
 	While[! done,
+		(* Also check elapsed time when asynchronous kernel timers are delayed. *)
+		If[SessionTime[] >= deadline,
+			result = pariFailure["PARITimeout", "PARI/GP exceeded the time limit. The session was stopped."];
+			Break[]
+		];
 		newOut = pariRead[process, "StandardOutput"];
 		newErr = pariRead[process, "StandardError"];
 		If[newOut =!= "", AppendTo[out, newOut]; outSize += StringLength[newOut]];
@@ -94,17 +100,31 @@ pariWait[process_ProcessObject, marker_String] := Module[{
 	result
 ]
 
-pariExchange[process_ProcessObject, code_String, mode_String, time_] := Module[{marker, command},
+pariExchange[process_ProcessObject, code_String, mode_String, time_] := Module[{marker, command, deadline, source, result},
 	marker = "PARILINK:" <> StringDelete[CreateUUID[], "-"] <> ":";
-	command = "parilinkrequest(" <> pariString[code] <> "," <> pariString[mode] <> "," <> pariString[marker] <> ");\n";
-	CheckAbort[
-		TimeConstrained[
-			If[Quiet @ Check[WriteLine[process, StringTrim[command]], $Failed] === $Failed,
-				pariFailure["PARIProcessStopped", "The request could not be sent to GP."],
-				pariWait[process, marker]
-			],
-			time, pariFailure["PARITimeout", "PARI/GP exceeded the time limit. The session was stopped."]
+	WithCleanup[
+		source = Quiet @ Check[CreateTemporary[], $Failed],
+		result = If[! StringQ[source] || Quiet @ Check[Export[source, code <> "\n", "Text", CharacterEncoding -> "UTF-8"], $Failed] === $Failed,
+			pariFailure["PARIRequestFailed", "The GP request file could not be written."],
+			(* read uses GP's script parser, including multiline and inline declarations.
+			   Evaluate outside bridge functions so closures cannot capture their locals. *)
+			(* A second input line detects nonlocal exits such as a GP stack reset. *)
+			command = "parilinkpending=1;iferr(parilinkresult(read(" <> pariString[source] <> ")," <> pariString[mode] <> "," <> pariString[marker] <>
+				"),parilinkexception,parilinkerror(parilinkexception," <> pariString[marker] <> "));\n" <>
+				"if(parilinkpending,print1(\"\\n\"," <> pariString[marker] <> ",\"[\\\"incomplete\\\"]\\n\"));\n";
+			deadline = SessionTime[] + time;
+			CheckAbort[
+				TimeConstrained[
+					If[Quiet @ Check[WriteLine[process, StringTrim[command]], $Failed] === $Failed,
+						pariFailure["PARIProcessStopped", "The request could not be sent to GP."],
+						pariWait[process, marker, deadline]
+					],
+					time, pariFailure["PARITimeout", "PARI/GP exceeded the time limit. The session was stopped."]
+				],
+				pariStopProcess[process]; Abort[]
+			]
 		],
-		pariStopProcess[process]; Abort[]
+		If[FailureQ[result], pariStopProcess[process]];
+		If[StringQ[source] && FileExistsQ[source], Quiet @ DeleteFile[source]]
 	]
 ]
