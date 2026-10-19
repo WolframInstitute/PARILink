@@ -1,0 +1,9 @@
+.DS_Store
+.deps/
+build/
+PARILink/build/
+PARILink/Documentation/
+PARILink/ResourceDefinition.nb
+*.paclet
+*.mx
+.env
