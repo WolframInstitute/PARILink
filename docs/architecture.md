@@ -57,10 +57,10 @@ without exposing the process protocol to callers.
 ## Scope and verification
 
 The initial target is PARI/GP 2.17 or newer with Wolfram Language 15 or newer.
-Live tests use GP 2.17.4 and 2.19.0 on macOS ARM64. See the
+Live tests use GP 2.17.4 and 2.19.0 on Linux x86-64 and macOS ARM64. See the
 [compatibility report](compatibility.md) for the upstream sweep and exclusions.
-Linux and Windows are not yet verified.
-No platform bundles or public download URLs are claimed by this source release.
+Windows is not yet verified. Release paclets contain the link and documentation;
+GP must be installed separately.
 
 The initial number-theory examples cover factorization, quadratic class
 numbers, elliptic curves, and number fields. PureMath method dispatch and its

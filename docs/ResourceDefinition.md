@@ -18,7 +18,7 @@ Categories: [Number Theory]
 - Requires an existing PARI/GP 2.17 or newer installation. No runtime is bundled.
 - Loading the paclet starts no process and installs nothing.
 - Exact values are converted; other values remain in the owning GP session.
-- Initial live verification covers macOS ARM64 with GP 2.17.4.
+- Tested on Linux x86-64 and macOS ARM64 with GP 2.17.4 and 2.19.0.
 
 ## Usage
 

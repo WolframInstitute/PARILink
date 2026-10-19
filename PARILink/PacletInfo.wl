@@ -6,6 +6,9 @@ PacletObject[<|
 	"Description" -> "Connect Wolfram Language to PARI/GP for number theory",
 	"Creator" -> "Wolfram Institute",
 	"License" -> "MIT",
+	"URL" -> "https://github.com/WolframInstitute/PARILink",
+	"Keywords" -> {"PARI", "GP", "number theory", "exact arithmetic"},
+	"Categories" -> {"Mathematics"},
 	"PrimaryContext" -> "WolframInstitute`PARILink`",
 	"Extensions" -> {
 		{"Kernel", "Root" -> "Kernel", "Context" -> {{"WolframInstitute`PARILink`", "PARILink.wl"}}},

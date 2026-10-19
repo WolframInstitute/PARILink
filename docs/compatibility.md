@@ -41,6 +41,12 @@ PARI/GP 2.17.4 and 2.19.0. The package checks pass 17 tests without GP and
 51 integration tests with each GP version. PacletPage builds six reference
 and guide pages, and the resulting archive loads in a fresh kernel.
 
+[CI also verifies Linux x86-64](https://github.com/WolframInstitute/PARILink/actions/runs/39316393771)
+with Wolfram Engine 15.0 and both GP versions: 27 offline tests, including
+build/release checks, and 51 integration tests pass for each. The CI archive
+contains all six documentation pages and loads in an isolated kernel.
+The full upstream sweep above was run on macOS.
+
 The integration tests include a cyclotomic factorization requiring more than
 the default 256 MiB stack limit and parallel calculations requiring worker
 stacks to grow. `StackLimit` sets the limit for the main thread and each worker.

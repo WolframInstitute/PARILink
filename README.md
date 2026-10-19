@@ -1,21 +1,42 @@
 # PARILink
 
+[![CI](https://github.com/WolframInstitute/PARILink/actions/workflows/ci.yml/badge.svg)](https://github.com/WolframInstitute/PARILink/actions/workflows/ci.yml)
+[![Release](https://github.com/WolframInstitute/PARILink/actions/workflows/release.yml/badge.svg)](https://github.com/WolframInstitute/PARILink/actions/workflows/release.yml)
+
 PARILink connects Wolfram Language to [PARI/GP](https://pari.math.u-bordeaux.fr/)
 for number theory.
+
+[Documentation](https://www.wolframcloud.com/obj/wolframinstitute/DeployedResources/Paclet/WolframInstitute/PARILink/Documentation/guide/PARILink.html)
+· [Cloud resource](https://www.wolframcloud.com/obj/wolframinstitute/DeployedResources/Paclet/WolframInstitute/PARILink/index.html)
+· [Releases](https://github.com/WolframInstitute/PARILink/releases)
 
 ## Requirements
 
 - Wolfram Language 15.0 or later
 - PARI/GP 2.17 or later
 
-Uses an existing GP installation. Tested on macOS Apple silicon with GP 2.17.4
-and 2.19.0. See the [compatibility report](docs/compatibility.md).
+Uses an existing GP installation. Tested on Linux x86-64 and macOS Apple
+silicon with GP 2.17.4 and 2.19.0. See the [compatibility report](docs/compatibility.md).
 
-## Load from source
+## Install
+
+Install the latest release from Wolfram Cloud:
 
 ```wolfram
-PacletDirectoryLoad["/path/to/PARILink/PARILink"];
+PacletInstall[
+	ResourceObject[
+		"https://www.wolframcloud.com/obj/wolframinstitute/" <>
+			"DeployedResources/Paclet/WolframInstitute/PARILink"
+	]["PacletFile"],
+	ForceVersionInstall -> True,
+	"ShowProgress" -> True
+];
 ```
+
+Versioned paclets and SHA-256 checksums are also on
+[GitHub Releases](https://github.com/WolframInstitute/PARILink/releases).
+
+Load the package:
 
 ```wolfram
 Needs["WolframInstitute`PARILink`"];
@@ -93,6 +114,12 @@ remain objects; copy their contents with `Vec` or `Mat`.
 See [PARICall](docs/en/Symbols/PARICall.md) for time limits and output options.
 
 ## Development
+
+To use a source checkout, load its paclet directory before `Needs`:
+
+```wolfram
+PacletDirectoryLoad["/path/to/PARILink/PARILink"];
+```
 
 ```bash
 make all
