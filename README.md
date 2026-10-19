@@ -8,7 +8,8 @@ for number theory.
 - Wolfram Language 15.0 or later
 - PARI/GP 2.17 or later
 
-Uses an existing GP installation. Tested on macOS Apple silicon with GP 2.17.4.
+Uses an existing GP installation. Tested on macOS Apple silicon with GP 2.17.4
+and 2.19.0. See the [compatibility report](docs/compatibility.md).
 
 ## Load from source
 
@@ -28,35 +29,43 @@ Start GP:
 session = StartPARISession[];
 ```
 
-Factor an integer:
+Find the Galois group of a quintic:
 
 ```wolfram
-PARICall[session, "factor", 360]
+polynomial = PARIEvaluate[session, "x^5 - x - 1"];
 ```
-
-Returns `{{2, 3}, {3, 2}, {5, 1}}`.
-
-Compute a quadratic class number:
 
 ```wolfram
-PARICall[session, "qfbclassno", -23]
+Last[PARICall[session, "polgalois", polynomial]]
 ```
 
-Returns `3`.
+Returns `"S5"`, the symmetric group on five letters.
 
-Retain a polynomial:
+Count points on an elliptic curve over the field with 101 elements:
 
 ```wolfram
-polynomial = PARIEvaluate[session, "x^3 - x - 1"];
+curve = PARICall[session, "ellinit", {0, 0, 0, -1, 0}, 101,
+	"ReturnType" -> "Object"];
 ```
-
-Compute its number-field discriminant:
 
 ```wolfram
-PARICall[session, "nfdisc", polynomial]
+PARICall[session, "ellcard", curve]
 ```
 
-Returns `-23`.
+Returns `104`, including the point at infinity.
+
+Compute Fourier coefficients of a weight 2, level 11 newform:
+
+```wolfram
+form = PARIEvaluate[session, "mfeigenbasis(mfinit([11,2],0))[1]",
+	"ReturnType" -> "Object"];
+```
+
+```wolfram
+PARICall[session, "mfcoefs", form, 10]
+```
+
+Returns `{0, 1, -2, -1, 2, 1, 2, -2, 0, -2, -2}` (degrees 0 through 10).
 
 Close GP and release its objects:
 
@@ -72,7 +81,9 @@ DeleteObject[session];
 | Vectors and matrices | Lists |
 | Other values | `PARIObject` |
 
-`Normal[object]` copies a supported retained value.
+Use `"ReturnType" -> "Object"` to reuse a GP structure in later calls.
+`Normal[object]` copies a supported retained value. Mutable lists and maps
+remain objects; copy their contents with `Vec` or `Mat`.
 
 ## Errors
 
