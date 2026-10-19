@@ -6,7 +6,7 @@
 PARILink connects Wolfram Language to [PARI/GP](https://pari.math.u-bordeaux.fr/)
 for number theory.
 
-[Documentation](https://www.wolframcloud.com/obj/wolframinstitute/DeployedResources/Paclet/WolframInstitute/PARILink/Documentation/guide/PARILink.html)
+[Documentation](https://www.wolframcloud.com/obj/wolframinstitute/PARILink)
 · [Cloud resource](https://www.wolframcloud.com/obj/wolframinstitute/DeployedResources/Paclet/WolframInstitute/PARILink/index.html)
 · [Releases](https://github.com/WolframInstitute/PARILink/releases)
 
