@@ -123,6 +123,13 @@ jobs:
         shell: msys2 {0}
         run: bash scripts/build-runtime.sh
 
+      - name: Preserve failed build logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: PARILink-build-logs-${{ matrix.system }}
+          path: build/runtimes/${{ matrix.system }}/*.log
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: PARILink-runtime-${{ matrix.system }}

@@ -44,7 +44,11 @@ case "$system" in
         export CFLAGS="$CFLAGS -arch x86_64"
         ;;
     MacOSX-ARM64) export MACOSX_DEPLOYMENT_TARGET=13.0 ;;
-    Windows-*) export CC=gcc LDFLAGS='-static -static-libgcc' ;;
+    Windows-*)
+        export CC=gcc LDFLAGS='-static -static-libgcc'
+        # GMP 6.3's configure probes predate GCC 15's C23 default.
+        export CFLAGS="$CFLAGS -std=gnu17"
+        ;;
 esac
 
 graphics=svg
@@ -53,7 +57,14 @@ if [[ $system == Windows-* ]]; then graphics=win32; fi
 jobs=${PARILINK_BUILD_JOBS:-4}
 [[ $jobs =~ ^[1-9][0-9]*$ ]] || { echo 'Invalid PARILINK_BUILD_JOBS' >&2; exit 1; }
 printf 'Building GP %s and GMP %s for %s...\n' "$pari_version" "$gmp_version" "$system"
-trap 'tail -80 "$output/build.log" >&2' ERR
+report_failure() {
+    tail -80 "$output/build.log" >&2
+    if [[ -f $work/gmp-$gmp_version/config.log ]]; then
+        cp "$work/gmp-$gmp_version/config.log" "$output/gmp-configure.log"
+        tail -100 "$output/gmp-configure.log" >&2
+    fi
+}
+trap report_failure ERR
 (
     cd "$work/gmp-$gmp_version"
     ./configure "${gmp_options[@]}"
