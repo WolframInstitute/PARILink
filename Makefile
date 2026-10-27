@@ -3,7 +3,7 @@ PARILINK_GP ?= gp
 UPSTREAM_OUTPUT ?= build/upstream
 
 .DEFAULT_GOAL := help
-.PHONY: help all check test test-hooks test-pari test-upstream ci ci-build deps docs build runtime stage-runtime check-release publish hooks
+.PHONY: help all check test test-hooks test-pari test-upstream ci ci-build deps docs build runtime stage-runtime check-build check-release publish hooks
 
 help:
 	@printf '  make %-12s %s\n' \
@@ -19,13 +19,14 @@ help:
 		deps 'fetch pinned documentation tools' \
 		docs 'build documentation using PacletPage' \
 		build 'build and check the paclet locally using PacletPage' \
+		check-build 'verify a restored PacletPage archive without publishing' \
 		check-release 'verify a release-tag checkout in GitHub Actions' \
 		publish 'publish the verified archive from a release-tag workflow'
 
 all ci ci-build: hooks test-hooks
 ci-build: deps
 
-all check test test-pari ci ci-build docs build check-release publish:
+all check test test-pari ci ci-build docs build check-build check-release publish:
 	$(WOLFRAMSCRIPT) -file scripts/project.wls $@
 
 test-hooks:

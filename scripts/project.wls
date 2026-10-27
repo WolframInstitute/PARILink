@@ -167,12 +167,7 @@ checkRelease[environment_Association : Association[GetEnvironment[]]] := Module[
 	Print["PASS: release tag ", tag];
 ]
 
-publish[] := Module[{account, password, prepared, result},
-	checkRelease[];
-	account = Environment["WOLFRAM_CLOUD_USER"];
-	password = Environment["WOLFRAM_CLOUD_PASSWORD"];
-	require[AllTrue[{account, password}, StringQ[#] && StringTrim[#] =!= "" &],
-		"Set WOLFRAM_CLOUD_USER and WOLFRAM_CLOUD_PASSWORD as release secrets"];
+checkBuild[] := Module[{prepared},
 	loadPublishing[];
 	(* PacletPage checks the archive hash and the sources before any cloud connection. *)
 	prepared = Block[{$CloudConnected = False},
@@ -180,6 +175,16 @@ publish[] := Module[{account, password, prepared, result},
 			"ResourceOptions" -> {"Build" -> False, "Parallel" -> False}]
 	];
 	checkArchive[prepared];
+	prepared
+]
+
+publish[] := Module[{account, password, result},
+	checkRelease[];
+	account = Environment["WOLFRAM_CLOUD_USER"];
+	password = Environment["WOLFRAM_CLOUD_PASSWORD"];
+	require[AllTrue[{account, password}, StringQ[#] && StringTrim[#] =!= "" &],
+		"Set WOLFRAM_CLOUD_USER and WOLFRAM_CLOUD_PASSWORD as release secrets"];
+	checkBuild[];
 	require[Quiet[Check[CloudConnect[account, password], $Failed]] =!= $Failed && TrueQ[$CloudConnected],
 		"Could not connect to the publishing account"];
 	result = pageCall["PublishPacletPage", pacletDirectory, "PARILink", "Account" -> account, "Build" -> False,
@@ -204,6 +209,7 @@ Exit @ Catch[
 			Print[result]
 		],
 		"build", build[],
+		"check-build", checkBuild[],
 		"check-release", checkRelease[],
 		"publish", publish[],
 		_, require[False, "Unknown command: " <> command]

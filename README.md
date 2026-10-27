@@ -14,7 +14,7 @@ for number theory.
 
 - Wolfram Language 15.0 or later
 
-Starting with 0.2.0, the paclet includes PARI/GP 2.19.0 and its number-theory
+The paclet includes PARI/GP 2.19.0 and its number-theory
 data. No separate GP installation is needed.
 
 | System | Processors |

@@ -118,6 +118,7 @@ jobs:
         run: |
           tar -xzf build/release/pacletpage-build.tar.gz -C PARILink
           cmp build/release/*.paclet PARILink/build/*.paclet
+          cp -a PARILink/build/WolframInstitute__PARILink/Resources/Runtime PARILink/Resources/
           make deps
 
       - name: Publish the resource and documentation site

@@ -271,6 +271,20 @@ jobs:
             scripts/build-runtime.sh scripts/runtime.py scripts/runtime.json \
             build/runtime-sources/*.tar.gz build/runtime-sources/*.tar.xz build/runtime-sources/*.tgz
 
+      - name: Verify release restoration in a clean checkout
+        if: matrix.gp == '2.19.0'
+        env:
+          PARILINK_REQUIRE_ALL_RUNTIMES: '1'
+        run: |
+          clean="$RUNNER_TEMP/pari-release-check"
+          git worktree add --detach "$clean" HEAD
+          tar -xzf build/release/pacletpage-build.tar.gz -C "$clean/PARILink"
+          cmp build/release/*.paclet "$clean"/PARILink/build/*.paclet
+          cp -a "$clean/PARILink/build/WolframInstitute__PARILink/Resources/Runtime" "$clean/PARILink/Resources/"
+          ln -s "$GITHUB_WORKSPACE/.deps" "$clean/.deps"
+          make -C "$clean" check-build
+          git worktree remove --force "$clean"
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: matrix.gp == '2.19.0'
         with:

@@ -59,7 +59,7 @@ without exposing the process protocol to callers.
 The initial target is PARI/GP 2.17 or newer with Wolfram Language 15 or newer.
 Live tests use GP 2.17.4 and 2.19.0 on Linux x86-64 and macOS ARM64. See the
 [compatibility report](compatibility.md) for the upstream sweep and exclusions.
-Version 0.2.0 adds native runtime and final-archive checks for Windows x86-64,
+CI includes native runtime and final-archive checks for Windows x86-64,
 macOS Intel and ARM64, and Linux x86-64 and ARM64. These checks run GP with an
 empty search path, exercise all bundled data packages, and test the bridge's
 exact values, Unicode strings, and request files with spaces in their paths.

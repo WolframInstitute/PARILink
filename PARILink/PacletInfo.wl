@@ -1,7 +1,7 @@
 PacletObject[<|
 	"Name" -> "WolframInstitute/PARILink",
 	"PublisherID" -> "WolframInstitute",
-	"Version" -> "0.2.0",
+	"Version" -> "0.2.1",
 	"WolframVersion" -> "15.0+",
 	"Description" -> "Connect Wolfram Language to PARI/GP for number theory",
 	"Creator" -> "Wolfram Institute",
