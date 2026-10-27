@@ -36,16 +36,23 @@ VerificationTest[
 ]
 
 VerificationTest[
+	releaseTag[Append[releaseEnvironment, "GITHUB_EVENT_NAME" -> "workflow_dispatch"], "0.1.0"],
+	"v0.1.0",
+	TestID -> "Release: manual run on a matching release tag is accepted"
+]
+
+VerificationTest[
 	Block[{Print = (Null &)},
 		Catch[releaseTag[Join[releaseEnvironment, #], "0.1.0"], "exit"] & /@ {
-			<|"GITHUB_ACTIONS" -> "false"|>, <|"GITHUB_EVENT_NAME" -> "workflow_dispatch"|>,
+			<|"GITHUB_ACTIONS" -> "false"|>,
+			<|"GITHUB_EVENT_NAME" -> "workflow_dispatch", "GITHUB_REF_TYPE" -> "branch", "GITHUB_REF" -> "refs/heads/main"|>,
 			<|"GITHUB_EVENT_NAME" -> "pull_request"|>, <|"GITHUB_EVENT_NAME" -> "release"|>,
 			<|"GITHUB_REF_TYPE" -> "branch"|>, <|"GITHUB_REF" -> "refs/heads/v0.1.0"|>,
 			<|"GITHUB_REF_NAME" -> "v0.2.0", "GITHUB_REF" -> "refs/tags/v0.2.0"|>
 		}
 	],
 	ConstantArray[1, 7],
-	TestID -> "Release: branches, manual runs, PRs, and mismatched tags cannot publish"
+	TestID -> "Release: branches, PRs, and mismatched tags cannot publish"
 ]
 
 VerificationTest[

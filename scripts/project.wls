@@ -141,8 +141,9 @@ build[] := Module[{options = loadPublishing[], context = prepareBuild[], result}
 ]
 
 releaseTag[environment_Association, version_String] := Module[{tag = Lookup[environment, "GITHUB_REF_NAME", ""]},
-	require[Lookup[environment, {"GITHUB_ACTIONS", "GITHUB_EVENT_NAME", "GITHUB_REF_TYPE"}] === {"true", "push", "tag"},
-		"Publishing requires a release-tag push in GitHub Actions"];
+	require[Lookup[environment, {"GITHUB_ACTIONS", "GITHUB_REF_TYPE"}] === {"true", "tag"} &&
+		MemberQ[{"push", "workflow_dispatch"}, Lookup[environment, "GITHUB_EVENT_NAME"]],
+		"Publishing requires a release-tag workflow in GitHub Actions"];
 	require[StringMatchQ[tag, RegularExpression["v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)"]] &&
 		tag === "v" <> version && Lookup[environment, "GITHUB_REF"] === "refs/tags/" <> tag,
 		"The release tag must be vX.Y.Z matching PacletInfo.wl"];

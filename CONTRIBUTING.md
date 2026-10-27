@@ -160,7 +160,8 @@ Use squash merges with the pull request title as the commit subject.
 
 ## Releases
 
-[Release](.github/workflows/release.yml) runs only when a `vX.Y.Z` tag is pushed.
+[Release](.github/workflows/release.yml) publishes only from a `vX.Y.Z` tag,
+either when pushed or when the workflow is started manually on that tag.
 The tag must match `PARILink/PacletInfo.wl` and point to a commit on `main`.
 It finds the `main` CI run for that exact commit and waits for it to pass, then
 publishes its verified archive and documentation through PacletPage. No tests,
@@ -195,7 +196,7 @@ git push origin v0.1.0
 ```
 
 `make publish` is the workflow's entry point. It refuses local runs, branch
-pushes, manual workflow runs, mismatched tags, and modified checkouts. To retry
+runs, mismatched tags, and modified checkouts. To retry
 a failed release, rerun the original tag workflow; do not move an existing tag.
 Build artifacts are retained for 30 days. If one has expired, rerun the original
 `main` push CI run before retrying the release.

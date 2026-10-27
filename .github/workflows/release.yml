@@ -3,6 +3,7 @@ name: Release
 on:
   push:
     tags: ['v[0-9]+.[0-9]+.[0-9]+']
+  workflow_dispatch:
 
 permissions:
   actions: read
@@ -16,6 +17,7 @@ concurrency:
 jobs:
   verify:
     name: Find the verified build
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-24.04
     timeout-minutes: 50
     outputs:
@@ -44,9 +46,10 @@ jobs:
           }
           commit=$(git rev-parse HEAD)
           run=$(gh run list --workflow ci.yml --branch main --commit "$commit" \
-            --event push --limit 1 --json databaseId --jq '.[0].databaseId')
+            --limit 20 --json databaseId,event \
+            --jq '[.[] | select(.event == "push" or .event == "workflow_dispatch")][0].databaseId')
           if [ -z "$run" ]; then
-            echo '::error title=Missing CI run::Push the release commit to main and let CI run before tagging.'
+            echo '::error title=Missing CI run::Run CI on main for the release commit before publishing.'
             exit 1
           fi
           gh run watch "$run" --exit-status --interval 30
@@ -56,7 +59,7 @@ jobs:
   publish:
     name: Publish with PacletPage
     needs: verify
-    if: github.event_name == 'push' && github.ref_type == 'tag'
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     container:

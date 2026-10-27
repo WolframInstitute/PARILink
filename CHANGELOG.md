@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 — Unreleased
+## 0.2.0 — 2026-10-28
 
 - Bundle GP 2.19.0 with GMP and data for Galois groups, number fields, and elliptic curves.
 - Build runtimes for Windows x86-64, macOS Intel and Apple Silicon, and Linux x86-64 and ARM64.
