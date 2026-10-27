@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0 — Unreleased
+
+- Bundle GP 2.19.0 with GMP and data for Galois groups, number fields, and elliptic curves.
+- Build runtimes for Windows x86-64, macOS Intel and Apple Silicon, and Linux x86-64 and ARM64.
+- Select the bundled runtime automatically while preserving executable overrides.
+- Restore executable permissions after installation and locate data relative to the paclet.
+- Check the final archive on each platform without GP or other tools on the search path.
+- Include third-party licenses, corresponding sources, and build instructions in the paclet.
+- Continue publishing PacletPage's verified archive only from release tags.
+
 ## 0.1.0 — 2026-10-19
 
 - Add explicit PARI/GP sessions and structured function evaluation.

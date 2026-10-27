@@ -17,10 +17,12 @@ RelatedGuides: [PARILink]
 
 ## Details & Options
 
-- Requires PARI/GP 2.17 or newer and Wolfram Language 15 or newer.
-- Loading the paclet does not start GP. The function does not install it.
-- With `"Executable" -> Automatic`, `PARILINK_GP` takes precedence over the
-  executable search path and common macOS installation locations.
+- Requires Wolfram Language 15 or newer. Release paclets include GP 2.19.0.
+- Loading the paclet does not start GP. Starting a session does not download or install software.
+- With `"Executable" -> Automatic`, the search order is `PARILINK_GP`, the
+  bundled GP, the executable search path, then common macOS installation locations.
+- An explicit executable or environment override must exist; an invalid override returns a `Failure`.
+- External GP installations must be version 2.17 or newer. They use their own data directory.
 - `TimeConstraint -> 30` limits the startup handshake in seconds.
 - `"StackLimit" -> 256 * 1024^2` sets the maximum stack size in bytes for GP's
   main thread and each parallel worker. It must be an integer of at least 8 MiB.

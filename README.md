@@ -13,10 +13,18 @@ for number theory.
 ## Requirements
 
 - Wolfram Language 15.0 or later
-- PARI/GP 2.17 or later
 
-Uses an existing GP installation. Tested on Linux x86-64 and macOS Apple
-silicon with GP 2.17.4 and 2.19.0. See the [compatibility report](docs/compatibility.md).
+Starting with 0.2.0, the paclet includes PARI/GP 2.19.0 and its number-theory
+data. No separate GP installation is needed.
+
+| System | Processors |
+| --- | --- |
+| macOS 13 or later | Apple Silicon, Intel |
+| Linux with glibc 2.35 or later | ARM64, x86-64 |
+| Windows 10 or later | x86-64 |
+
+Version 0.1.0 requires a separate GP installation. See the
+[compatibility report](docs/compatibility.md) for function coverage.
 
 ## Install
 
@@ -49,6 +57,9 @@ Start GP:
 ```wolfram
 session = StartPARISession[];
 ```
+
+To use your own GP 2.17 or later, set `"Executable" -> "/path/to/gp"` when
+starting a session, or set the `PARILINK_GP` environment variable.
 
 Find the Galois group of a quintic:
 
@@ -127,6 +138,12 @@ make all
 
 ```bash
 make test-pari
+```
+
+Build the bundled runtime for local development:
+
+```bash
+make runtime stage-runtime
 ```
 
 Build and publishing instructions: [CONTRIBUTING.md](CONTRIBUTING.md).

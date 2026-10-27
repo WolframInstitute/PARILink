@@ -75,13 +75,92 @@ jobs:
         run: |
           git diff --check "$(git hash-object -t tree /dev/null)" HEAD
           sh -n .githooks/commit-msg
-          bash -n scripts/fetch-deps.sh
-          python3 -m py_compile tests/upstream/prepare.py
+          bash -n scripts/fetch-deps.sh scripts/build-runtime.sh
+          python3 -m py_compile tests/upstream/prepare.py scripts/runtime.py
           make test-hooks
+
+  runtime:
+    name: GP runtime (${{ matrix.system }})
+    needs: repository
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {system: Linux-x86-64, runner: ubuntu-22.04}
+          - {system: Linux-ARM64, runner: ubuntu-22.04-arm}
+          - {system: MacOSX-ARM64, runner: macos-15}
+          - {system: MacOSX-x86-64, runner: macos-15-intel}
+          - {system: Windows-x86-64, runner: windows-2025}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: UCRT64
+          update: true
+          install: base-devel mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-python
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: runtime
+        with:
+          path: |
+            build/runtimes/${{ matrix.system }}/*.tar.gz*
+            build/runtime-sources/pari-*.tar.gz
+            build/runtime-sources/gmp-*.tar.xz
+          key: runtime-${{ matrix.system }}-${{ hashFiles('scripts/build-runtime.sh', 'scripts/runtime.py', 'scripts/runtime.json') }}
+
+      - name: Build Unix runtime
+        if: runner.os != 'Windows' && steps.runtime.outputs.cache-hit != 'true'
+        run: make runtime
+
+      - name: Build Windows runtime
+        if: runner.os == 'Windows' && steps.runtime.outputs.cache-hit != 'true'
+        shell: msys2 {0}
+        run: bash scripts/build-runtime.sh
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: PARILink-runtime-${{ matrix.system }}
+          path: build/runtimes/${{ matrix.system }}/*.tar.gz*
+          if-no-files-found: error
+          compression-level: 0
+
+  data:
+    name: PARI sources and data
+    needs: repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: build/runtime-sources
+          key: pari-sources-${{ hashFiles('scripts/runtime.json') }}
+
+      - name: Download and verify the corresponding sources and data
+        run: python3 scripts/runtime.py fetch --data
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: PARILink-sources
+          path: |
+            build/runtime-sources/*.tar.gz
+            build/runtime-sources/*.tar.xz
+            build/runtime-sources/*.tgz
+          if-no-files-found: error
+          compression-level: 0
 
   paclet:
     name: Paclet (GP ${{ matrix.gp }})
-    needs: [commits, repository]
+    needs: [commits, repository, runtime, data]
     # Forks have no entitlement; their repository and commit checks still run.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
@@ -104,7 +183,7 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends \
-            git ca-certificates curl make libgmp10 python3 unzip zstd
+            git ca-certificates curl make libgmp10 python3 unzip zstd binutils
           git config --system --add safe.directory "$GITHUB_WORKSPACE"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -119,8 +198,26 @@ jobs:
           fi
 
       - uses: ./.github/actions/setup-pari
+        if: matrix.gp == '2.17.4'
         with:
           version: ${{ matrix.gp }}
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: matrix.gp == '2.19.0'
+        with:
+          pattern: PARILink-runtime-*
+          path: build/runtimes
+          merge-multiple: true
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: matrix.gp == '2.19.0'
+        with:
+          name: PARILink-sources
+          path: build/runtime-sources
+
+      - name: Stage all five runtimes and shared data
+        if: matrix.gp == '2.19.0'
+        run: python3 scripts/runtime.py stage --all
 
       - name: Cache pinned documentation tools
         if: matrix.gp == '2.19.0'
@@ -148,7 +245,12 @@ jobs:
       - name: Check, test, and build in one kernel
         env:
           TARGET: ${{ matrix.gp == '2.19.0' && 'ci-build' || 'ci' }}
+          PARILINK_REQUIRE_ALL_RUNTIMES: ${{ matrix.gp == '2.19.0' && '1' || '' }}
         run: make "$TARGET"
+
+      - name: Install the archive and test the public link without system GP
+        if: matrix.gp == '2.19.0'
+        run: wolframscript -file tests/Installed.wls PARILink/build/*.paclet
 
       - name: Preserve the verified archive and documentation
         if: matrix.gp == '2.19.0'
@@ -158,6 +260,9 @@ jobs:
           tar --exclude=build/cache --exclude=build/incremental \
             -czf build/release/pacletpage-build.tar.gz -C PARILink \
             Documentation ResourceDefinition.nb build
+          tar -czf build/release/PARILink-runtime-sources.tar.gz \
+            scripts/build-runtime.sh scripts/runtime.py scripts/runtime.json \
+            build/runtime-sources/*.tar.gz build/runtime-sources/*.tar.xz build/runtime-sources/*.tgz
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: matrix.gp == '2.19.0'
@@ -167,3 +272,43 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 30
+
+  installed-runtime:
+    name: Packaged GP (${{ matrix.system }})
+    needs: paclet
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {system: Linux-x86-64, runner: ubuntu-22.04}
+          - {system: Linux-ARM64, runner: ubuntu-22.04-arm}
+          - {system: MacOSX-ARM64, runner: macos-15}
+          - {system: MacOSX-x86-64, runner: macos-15-intel}
+          - {system: Windows-x86-64, runner: windows-2025}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: PARILink-verified
+          path: build/release
+
+      - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: UCRT64
+          update: true
+          install: mingw-w64-ucrt-x86_64-binutils mingw-w64-ucrt-x86_64-python
+
+      - name: Run GP from the final archive without a system installation
+        if: runner.os != 'Windows'
+        run: python3 scripts/runtime.py check-archive build/release/*.paclet --all
+
+      - name: Run packaged GP on Windows without a system installation
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: python3 scripts/runtime.py check-archive build/release/*.paclet --all

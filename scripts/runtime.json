@@ -1,0 +1,20 @@
+{
+  "systems": ["Linux-x86-64", "Linux-ARM64", "MacOSX-x86-64", "MacOSX-ARM64", "Windows-x86-64"],
+  "pari": {
+    "version": "2.19.0",
+    "url": "https://pari.math.u-bordeaux.fr/pub/pari/unix/pari-2.19.0.tar.gz",
+    "sha256": "f317b9722eb5d9094a60303774f066f3a83e3ec1f170be8546c44d7583f30b6d"
+  },
+  "gmp": {
+    "version": "6.3.0",
+    "url": "https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz",
+    "sha256": "a3c2b80201b89e68616f4ad30bc66aee4927c3ce50e33929ca819d5c43538898"
+  },
+  "data": {
+    "elldata": "dd551e64932d4ab27b3f2b2d1da871c2353672fc1a74705c52e3c0de84bd0cf6",
+    "galpol": "562af28316ee335ee38c1172c2d5ecccb79f55c368fb9f2c6f40fc0f416bb01b",
+    "seadata": "c9282a525ea3f92c1f9c6c69e37ac5a87b48fb9ccd943cfd7c881a3851195833",
+    "galdata": "b7c1650099b24a20bdade47a85a928351c586287f0d4c73933313873e63290dd",
+    "nflistdata": "2c19a3e02afd3bba2af3071a7faa80924a75b00bb9713286c886b7fb460944bc"
+  }
+}

@@ -70,6 +70,7 @@ jobs:
       QT_QPA_PLATFORM: offscreen
       GP_SVG_VIEWER: /usr/bin/true
       GP_POSTSCRIPT_VIEWER: /usr/bin/true
+      PARILINK_REQUIRE_ALL_RUNTIMES: '1'
     steps:
       - name: Check publishing credentials
         env:
@@ -86,7 +87,7 @@ jobs:
       - name: Install publishing tools
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends git ca-certificates curl make unzip zstd
+          apt-get install -y --no-install-recommends git ca-certificates curl make unzip zstd python3 binutils
           git config --system --add safe.directory "$GITHUB_WORKSPACE"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -138,7 +139,7 @@ jobs:
           run-id: ${{ needs.verify.outputs.run }}
           github-token: ${{ github.token }}
 
-      - name: Attach the verified paclet and checksum
+      - name: Attach the verified paclet, corresponding sources, and checksums
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -147,11 +148,13 @@ jobs:
         run: |
           cd dist
           archive="WolframInstitute__PARILink-${TAG#v}.paclet"
+          sources=PARILink-runtime-sources.tar.gz
           test -f "$archive"
-          sha256sum "$archive" > "$archive.sha256"
+          test -f "$sources"
+          sha256sum "$archive" "$sources" > SHA256SUMS
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$archive" "$archive.sha256" --clobber
+            gh release upload "$TAG" "$archive" "$sources" SHA256SUMS --clobber
           else
-            gh release create "$TAG" "$archive" "$archive.sha256" \
+            gh release create "$TAG" "$archive" "$sources" SHA256SUMS \
               --title "$TAG" --generate-notes --verify-tag
           fi

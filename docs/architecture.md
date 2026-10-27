@@ -11,10 +11,10 @@ without exposing the process protocol to callers.
 
 - Run GP as a separate process, started only by `StartPARISession`. This avoids
   introducing a native library and PARI's stack lifetime into the Wolfram kernel.
-- Use an explicit executable, `PARILINK_GP`, or GP on the executable search path.
-  This first source release uses an existing PARI/GP installation. It neither
-  downloads nor bundles a runtime. Runtime redistribution needs its own build,
-  source, license, and platform checks before it can be advertised.
+- Select an explicit executable, `PARILINK_GP`, the bundled GP, then an existing
+  installation. Explicit overrides never silently fall back to another program.
+  Starting a session locates the bundled data and restores GP's execute permission
+  if archive extraction removed it. Loading the package does neither.
 - Start with `-f -q`, disable the break loop and color, and ignore `.gprc`.
   User startup code must not change the link's protocol or produce side effects.
 - Keep one process per session. Objects belong to that session and Wolfram
@@ -59,18 +59,37 @@ without exposing the process protocol to callers.
 The initial target is PARI/GP 2.17 or newer with Wolfram Language 15 or newer.
 Live tests use GP 2.17.4 and 2.19.0 on Linux x86-64 and macOS ARM64. See the
 [compatibility report](compatibility.md) for the upstream sweep and exclusions.
-Windows is not yet verified. Release paclets contain the link and documentation;
-GP must be installed separately.
+Version 0.2.0 adds native runtime and final-archive checks for Windows x86-64,
+macOS Intel and ARM64, and Linux x86-64 and ARM64. These checks run GP with an
+empty search path, exercise all bundled data packages, and test the bridge's
+exact values, Unicode strings, and request files with spaces in their paths.
 
-The initial number-theory examples cover factorization, quadratic class
-numbers, elliptic curves, and number fields. PureMath method dispatch and its
-optional installer should be added after a distributable PARILink release is
-available; a nonexistent archive must not appear as an installable library.
+## Bundled runtime
+
+`scripts/runtime.json` pins PARI, GMP, and five data packages by SHA-256.
+`make runtime` compiles GP and GMP on the target platform, runs GMP's tests,
+and rejects dependencies outside the operating system. GMP and the thread
+runtime are linked statically; GP supports parallel operations without another
+installation. Intel builds use baseline x86-64 instructions with GMP's runtime
+CPU selection. macOS targets 13.0; Linux builds use Ubuntu 22.04 (glibc 2.35).
+
+One paclet contains all five executables and one copy of the data. Data files
+are uncompressed at build time so GP never needs an external gzip program to
+read them. Source archives, build scripts, and licenses accompany the binaries,
+including downloads from Wolfram Cloud.
+
+CI caches each compiled runtime separately. A single Linux job assembles the
+runtimes, evaluates documentation, and builds the paclet with PacletPage. Every
+platform then runs its GP from that exact archive. Release tags require the
+whole CI run to pass and reuse the archive, documentation, and sources.
+
+PureMath can install the released paclet through its existing library dialog;
+runtime discovery, data, and platform packaging remain PARILink's responsibility.
 
 ## References
 
 - [PARI/GP manual](https://pari.math.u-bordeaux.fr/doc.html)
 - [GP error handling](https://pari.math.u-bordeaux.fr/dochtml/html/Programming_in_GP__control_statements.html#iferr)
 - [GAPLink design](../../GAPLink/docs/architecture.md)
-- [PureMath's external libraries](../../PureMath/docs/research/ExternalMathematicsLibraries.md)
+- [PureMath's external libraries](../../PureMath/docs/research/ExternalLibraries/ExternalMathematicsLibraries.md)
 - [PacletPage](https://github.com/WolframInstitute/PacletPage)

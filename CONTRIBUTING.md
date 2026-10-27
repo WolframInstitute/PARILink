@@ -5,7 +5,7 @@
 - Wolfram Language 15.0 or later
 - `wolframscript` on the executable search path
 - Git, Bash, `make`, and Python 3
-- PARI/GP 2.17 or later for integration tests and documentation examples
+- Bundled GP or an existing PARI/GP 2.17 or later for integration tests
 
 GP is not needed for `make all` or `make test`. See the
 [compatibility report](docs/compatibility.md) for verified versions and platforms.
@@ -88,13 +88,22 @@ publishing; keep the workflow in `scripts/project.wls`.
 
 ```bash
 make deps
+make runtime stage-runtime
 make docs
 make build
 ```
 
+`make runtime` builds GP and GMP for the current platform, checks their native
+code, and saves a compressed runtime under `build/runtimes/`. It needs a C
+compiler, `make`, `m4`, `curl`, Python 3.9 or later, and tar with xz support.
+On Windows, use MSYS2 UCRT64 with GCC and Python. `make stage-runtime` verifies
+the runtime and includes the five PARI data packages and corresponding sources.
+It does not install anything in the user's paclet directory.
+
 `make deps` fetches pinned tools into `.deps/`. `make docs` evaluates examples
 and generates notebooks. `make build` also creates the archive in
-`PARILink/build/` and checks that it loads in a fresh kernel. Builds run in
+`PARILink/build/`, checks that it loads in a fresh kernel, and runs its bundled
+GP with an empty search path. Builds run in
 offline dry-run mode after the dependencies are available. Generated notebooks,
 caches, and archives are ignored by Git.
 
@@ -113,9 +122,13 @@ make ci-build
 
 [CI](.github/workflows/ci.yml) checks commit messages and repository hygiene on
 pushes to `main` and pull requests. The Wolfram Engine 15.0 jobs run source
-checks and both test suites with GP 2.17.4 and 2.19.0 on Linux. PacletPage builds the
-documentation and paclet with GP 2.19.0, checks every page is present, and loads
-the archive in a fresh kernel. Plot viewers are disabled throughout CI.
+checks and both test suites with GP 2.17.4 and bundled GP 2.19.0 on Linux.
+Native jobs build GP for Windows x86-64, macOS Intel and ARM64, and Linux x86-64
+and ARM64. A single PacletPage build contains all five runtimes and one copy
+of the data. Each platform tests GP and the bridge from that final archive.
+The Linux Wolfram job also installs the archive, tests permission repair, and
+runs the integration suite with the executable search path empty.
+Plot viewers are disabled throughout CI.
 
 CI caches compiled GP executables, pinned documentation tools, and PacletPage's
 intermediate pages. Cache hits skip GP compilation and dependency fetches.
@@ -142,6 +155,7 @@ Manual CI runs validate and build; they cannot publish.
 
 Protect `main` by requiring pull requests and the `Commit messages`,
 `Repository checks`, `Paclet (GP 2.17.4)`, and `Paclet (GP 2.19.0)` checks.
+Also require every `GP runtime` and `Packaged GP` matrix check.
 Use squash merges with the pull request title as the commit subject.
 
 ## Releases
@@ -153,7 +167,8 @@ publishes its verified archive and documentation through PacletPage. No tests,
 GP compilation, or documentation builds are repeated during release.
 PacletPage checks the archive and source
 hashes before deployment. The GitHub release receives the same `.paclet` and
-its SHA-256 checksum after the published site's checks pass.
+the corresponding runtime sources, and SHA-256 checksums after the published
+site's checks pass. Source archives and licenses also travel inside the paclet.
 
 Publishing also needs these Actions secrets. Use the publishing account's
 full Wolfram ID for `WOLFRAM_CLOUD_USER`; each command prompts for its value:
@@ -186,9 +201,11 @@ Build artifacts are retained for 30 days. If one has expired, rerun the original
 `main` push CI run before retrying the release.
 PacletPage refuses to replace a published version from a different commit.
 
-The paclet requires an existing GP installation. CI does not bundle GP or
-publish its build tools. Runtime bundles need platform verification, license
-files, and corresponding source before PureMath can advertise them as installable.
+Local builds contain the current platform's runtime. Release builds require
+all five: `python3 scripts/runtime.py stage --all` refuses missing or damaged
+archives, and `PARILINK_REQUIRE_ALL_RUNTIMES=1` makes PacletPage's build and
+publication checks enforce the complete bundle. Never substitute a local
+single-platform archive for CI's release artifact.
 
 ## Security
 

@@ -83,14 +83,23 @@ checkArchive[result_] := (
 	require[result["Resource"]["Documentation"]["Missing"] === {} &&
 		result["Resource"]["Documentation"]["Flagged"] === <||>, "The archive is missing documentation pages"];
 	Print["PASS: ", result["Resource"]["Pages"], " documentation pages; archive loads cleanly"];
+	checkRuntime["check-archive", result["Resource"]["Archive"]];
 	Print[result["Resource"]["Archive"]];
 )
+
+checkRuntime[command_String, path_String] := Module[{result},
+	result = RunProcess[Join[{"python3", FileNameJoin[{root, "scripts", "runtime.py"}], command, path},
+		If[Environment["PARILINK_REQUIRE_ALL_RUNTIMES"] === "1", {"--all"}, {}]]];
+	Print[result["StandardOutput"]];
+	require[result["ExitCode"] === 0,
+		"Bundled runtime check failed. Run make runtime stage-runtime. " <> result["StandardError"]];
+]
 
 (* PacletPage tracks each page. Reset its caches when external inputs or guide
    navigation change; its own code hash does not include GP or Resources/. *)
 buildFingerprint[runtime_] := Module[{files},
 	files = Sort @ Select[Join[
-		FileNameJoin[{root, "scripts", #}] & /@ {"project.wls", "fetch-deps.sh"},
+		FileNameJoin[{root, "scripts", #}] & /@ {"project.wls", "fetch-deps.sh", "runtime.py", "runtime.json", "build-runtime.sh"},
 		{FileNameJoin[{pacletDirectory, "PacletInfo.wl"}]},
 		Flatten[FileNames["*", #, Infinity] & /@ {
 			FileNameJoin[{pacletDirectory, "Kernel"}], FileNameJoin[{pacletDirectory, "Resources"}],
@@ -103,6 +112,7 @@ buildFingerprint[runtime_] := Module[{files},
 ]
 
 prepareBuild[] := Module[{session, runtime, fingerprint, stamp, incremental, cache},
+	checkRuntime["check", FileNameJoin[{pacletDirectory, "Resources", "Runtime"}]];
 	loadSource[];
 	session = WolframInstitute`PARILink`StartPARISession[];
 	require[! FailureQ[session], "GP is required to evaluate documentation examples"];

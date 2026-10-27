@@ -1,6 +1,8 @@
 (* Process details are private. A failed exchange is never reused. *)
 
 PackageScoped[pariFindExecutable]
+PackageScoped[pariBundledExecutable]
+PackageScoped[pariRuntimeArguments]
 PackageScoped[pariStartProcess]
 PackageScoped[pariExchange]
 PackageScoped[pariStopProcess]
@@ -9,30 +11,66 @@ pariFindExecutable[path_String] := If[FileType[ExpandFileName[path]] === File,
 	ExpandFileName[path], pariFailure["PARIExecutableNotFound", "The GP executable could not be found.", <|"Path" -> path|>]
 ]
 
-pariFindExecutable[Automatic] := With[{
-	override = Environment["PARILINK_GP"],
-	path = Replace[Environment["PATH"], Except[_String] -> ""],
-	name = If[$OperatingSystem === "Windows", "gp.exe", "gp"]
-}, If[StringQ[override] && StringTrim[override] =!= "",
+pariRuntimeRoot[] := Quiet @ Check[
+	PacletObject["WolframInstitute/PARILink"]["AssetLocation", "PARIRuntime"], None
+]
+
+pariBundledExecutable[root_String, system_String] := FileNameJoin[{
+	root, system, If[StringStartsQ[system, "Windows"], "gp.exe", "gp"]
+}]
+pariBundledExecutable[] := Replace[pariRuntimeRoot[], {
+	root_String :> pariBundledExecutable[root, $SystemID], _ -> None
+}]
+
+pariFindExecutable[Automatic] := pariFindExecutable[Automatic,
+	Environment["PARILINK_GP"], pariBundledExecutable[], Environment["PATH"],
+	If[$OperatingSystem === "MacOSX", {"/opt/homebrew/bin/gp", "/usr/local/bin/gp", "/opt/local/bin/gp"}, {}],
+	$OperatingSystem
+]
+
+pariFindExecutable[Automatic, override_, bundled_, path_, common_List, system_String] := If[
+	StringQ[override] && StringTrim[override] =!= "",
 	pariFindExecutable[override],
 	With[{candidates = Join[
-		FileNameJoin[{#, name}] & /@ DeleteCases[StringSplit[path, If[$OperatingSystem === "Windows", ";", ":"]], ""],
-		If[$OperatingSystem === "MacOSX", {"/opt/homebrew/bin/gp", "/usr/local/bin/gp", "/opt/local/bin/gp"}, {}]
+		Cases[{bundled}, _String],
+		FileNameJoin[{#, If[system === "Windows", "gp.exe", "gp"]}] & /@
+			DeleteCases[StringTrim[#, WhitespaceCharacter | "\""] & /@
+				StringSplit[Replace[path, Except[_String] -> ""], If[system === "Windows", ";", ":"]], ""],
+		common
 	]}, Replace[SelectFirst[candidates, FileType[#] === File &, None],
-		None :> pariFailure["PARIExecutableNotFound", "Install PARI/GP or set the Executable option to its GP program."]
+		None :> pariFailure["PARIExecutableNotFound",
+			"No bundled or installed GP was found. Reinstall PARILink or set the Executable option to a GP program."]
 	]]
-]]
+]
 
 pariFindExecutable[_] := pariFailure["PARIInvalidOption", "Executable must be Automatic or a file path."]
 
+pariRuntimeArguments[executable_String] := Module[{bundled = pariBundledExecutable[], data, permissions},
+	If[! StringQ[bundled] || ExpandFileName[executable] =!= ExpandFileName[bundled], Return[{}]];
+	data = FileNameJoin[{pariRuntimeRoot[], "data"}];
+	If[! DirectoryQ[data], Return[pariFailure["PARIStartFailed", "The bundled PARI data is missing. Reinstall PARILink."]]];
+	If[$OperatingSystem =!= "Windows",
+		(* ZIP extraction may remove execute permission. Only repair this paclet's GP. *)
+		permissions = UnixPermissionsString /. FileInformation[executable];
+		If[! StringQ[permissions] || ! StringContainsQ[permissions, "x"],
+			If[Quiet @ Check[RunProcess[{"/bin/chmod", "u+x", executable}, "ExitCode"], $Failed] =!= 0,
+				Return[pariFailure["PARIStartFailed", "The bundled GP program could not be made executable."]]
+			]
+		]
+	];
+	{"--default", "datadir=" <> StringReplace[data, "\\" -> "/"]}
+]
+
 pariStartProcess[executable_String, stackLimit_Integer] := With[{
-	startup = PacletObject["WolframInstitute/PARILink"]["AssetLocation", "GPStartup"]
+	startup = PacletObject["WolframInstitute/PARILink"]["AssetLocation", "GPStartup"],
+	runtime = pariRuntimeArguments[executable]
 }, If[StringQ[startup] && FileExistsQ[startup],
-	Replace[Quiet @ Check[StartProcess[{
+	If[FailureQ[runtime], Return[runtime]];
+	Replace[Quiet @ Check[StartProcess[Join[{
 		executable, "-f", "-q", "--default", "colors=no", "--default", "breakloop=0",
 		"--default", "parisizemax=" <> IntegerString[stackLimit],
-		"--default", "threadsizemax=" <> IntegerString[stackLimit], startup
-	}], $Failed], Except[_ProcessObject] :> pariFailure["PARIStartFailed", "The GP process could not be started."]],
+		"--default", "threadsizemax=" <> IntegerString[stackLimit]
+	}, runtime, {startup}]], $Failed], Except[_ProcessObject] :> pariFailure["PARIStartFailed", "The GP process could not be started."]],
 	pariFailure["PARIStartFailed", "The PARILink startup file is missing."]
 ]]
 

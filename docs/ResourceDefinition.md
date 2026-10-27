@@ -15,10 +15,11 @@ Categories: [Number Theory]
 
 ## Details & Options
 
-- Requires an existing PARI/GP 2.17 or newer installation. No runtime is bundled.
+- Includes PARI/GP 2.19.0 and its number-theory data; no separate GP installation is needed.
 - Loading the paclet starts no process and installs nothing.
 - Exact values are converted; other values remain in the owning GP session.
-- Tested on Linux x86-64 and macOS ARM64 with GP 2.17.4 and 2.19.0.
+- Includes runtimes for Windows x86-64, macOS Intel and Apple Silicon, and Linux x86-64 and ARM64.
+- PARI/GP, GMP, and their source and license files are included separately from PARILink's MIT-licensed code.
 
 ## Usage
 

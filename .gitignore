@@ -4,6 +4,7 @@ build/
 PARILink/build/
 PARILink/Documentation/
 PARILink/ResourceDefinition.nb
+PARILink/Resources/Runtime/
 *.paclet
 *.mx
 .env

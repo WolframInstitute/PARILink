@@ -3,13 +3,15 @@ PARILINK_GP ?= gp
 UPSTREAM_OUTPUT ?= build/upstream
 
 .DEFAULT_GOAL := help
-.PHONY: help all check test test-hooks test-pari test-upstream ci ci-build deps docs build check-release publish hooks
+.PHONY: help all check test test-hooks test-pari test-upstream ci ci-build deps docs build runtime stage-runtime check-release publish hooks
 
 help:
 	@printf '  make %-12s %s\n' \
 		all 'source checks and tests without GP' \
 		test-hooks 'check the commit-message policy' \
-		test-pari 'integration tests with an installed GP' \
+		test-pari 'integration tests with bundled or installed GP' \
+		runtime 'build GP and GMP for this platform' \
+		stage-runtime 'include this platform runtime and PARI data in the paclet' \
 		test-upstream 'compare a local PARI_SOURCE release with GP (see docs/compatibility.md)' \
 		ci 'source checks and all tests in one Wolfram kernel' \
 		ci-build 'CI checks, tests, and PacletPage build in one Wolfram kernel' \
@@ -37,6 +39,12 @@ test-upstream:
 
 deps:
 	bash scripts/fetch-deps.sh
+
+runtime:
+	bash scripts/build-runtime.sh
+
+stage-runtime:
+	python3 scripts/runtime.py stage
 
 hooks:
 	git config core.hooksPath .githooks
