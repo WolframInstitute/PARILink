@@ -1,7 +1,8 @@
 # Third-party notices
 
-PARILink's Wolfram Language code uses the MIT License. Its bundled GP program
-runs as a separate process and has its own licenses.
+PARILink's Wolfram Language code uses the GNU General Public License, version 2
+or later, as PARI/GP does. Its bundled GP program runs as a separate process
+and keeps its own licenses.
 
 [PARI/GP](https://pari.math.u-bordeaux.fr/) is distributed under the GNU General
 Public License, version 2 or later. The bundle includes GP 2.19.0 and the

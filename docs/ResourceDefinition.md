@@ -8,7 +8,7 @@ Description: Connect Wolfram Language to PARI/GP for number theory
 ContributedBy: Wolfram Institute
 Keywords: [PARI, GP, number theory, exact arithmetic]
 MainGuide: Documentation/English/Guides/PARILink.nb
-License: MIT
+License: GPL-2.0-or-later
 WolframVersion: 15.0+
 Categories: [Number Theory]
 ---
@@ -19,7 +19,7 @@ Categories: [Number Theory]
 - Loading the paclet starts no process and installs nothing.
 - Exact values are converted; other values remain in the owning GP session.
 - Includes runtimes for Windows x86-64, macOS Intel and Apple Silicon, and Linux x86-64 and ARM64.
-- PARI/GP, GMP, and their source and license files are included separately from PARILink's MIT-licensed code.
+- PARILink uses the GNU General Public License, version 2 or later, as PARI/GP does. GP, GMP, their sources and their license files are included.
 
 ## Usage
 

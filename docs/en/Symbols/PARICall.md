@@ -32,6 +32,8 @@ RelatedGuides: [PARILink]
 - `"Output" -> "Print"` forwards GP output. `"Capture"` returns `"Result"`,
   `"StandardOutput"`, and `"StandardError"`; `"Discard"` returns only the result.
 - Errors return `Failure`. In capture mode, GP errors also contain the captured output.
+- Arguments of another form, such as a name that is not a string, return
+  `Failure["InvalidArguments", ...]` with the message `PARICall::args`.
 
 ## Basic Examples
 

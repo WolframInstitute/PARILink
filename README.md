@@ -3,32 +3,16 @@
 [![CI](https://github.com/WolframInstitute/PARILink/actions/workflows/ci.yml/badge.svg)](https://github.com/WolframInstitute/PARILink/actions/workflows/ci.yml)
 [![Release](https://github.com/WolframInstitute/PARILink/actions/workflows/release.yml/badge.svg)](https://github.com/WolframInstitute/PARILink/actions/workflows/release.yml)
 
-PARILink connects Wolfram Language to [PARI/GP](https://pari.math.u-bordeaux.fr/)
-for number theory.
-
-[Documentation](https://www.wolframcloud.com/obj/wolframinstitute/PARILink)
-· [Cloud resource](https://www.wolframcloud.com/obj/wolframinstitute/DeployedResources/Paclet/WolframInstitute/PARILink/index.html)
-· [Releases](https://github.com/WolframInstitute/PARILink/releases)
-
-## Requirements
-
-- Wolfram Language 15.0 or later
-
-The paclet includes PARI/GP 2.19.0 and its number-theory
-data. No separate GP installation is needed.
-
-| System | Processors |
-| --- | --- |
-| macOS 13 or later | Apple Silicon, Intel |
-| Linux with glibc 2.35 or later | ARM64, x86-64 |
-| Windows 10 or later | x86-64 |
-
-Version 0.1.0 requires a separate GP installation. See the
-[compatibility report](docs/compatibility.md) for function coverage.
+PARILink connects Wolfram Language to [PARI/GP](https://pari.math.u-bordeaux.fr/), a
+system for number theory. Use GP's number fields, elliptic curves, modular forms and
+L-functions from a Wolfram Language session.
 
 ## Install
 
-Install the latest release from Wolfram Cloud:
+PARILink needs Wolfram Language 15.0 or later on macOS 13 or later (Apple silicon or
+Intel), Linux with glibc 2.35 or later (x86-64 or ARM64) or Windows 10 or later (x86-64).
+The paclet includes GP and its number-theory data, so you do not need to install GP
+yourself.
 
 ```wolfram
 PacletInstall[
@@ -41,63 +25,31 @@ PacletInstall[
 ];
 ```
 
-Versioned paclets and SHA-256 checksums are also on
-[GitHub Releases](https://github.com/WolframInstitute/PARILink/releases).
+## Quick start
 
-Load the package:
+Start GP and factor an integer:
 
 ```wolfram
 Needs["WolframInstitute`PARILink`"];
-```
-
-## Examples
-
-Start GP:
-
-```wolfram
 session = StartPARISession[];
-```
-
-To use your own GP 2.17 or later, set `"Executable" -> "/path/to/gp"` when
-starting a session, or set the `PARILINK_GP` environment variable.
-
-Find the Galois group of a quintic:
-
-```wolfram
-polynomial = PARIEvaluate[session, "x^5 - x - 1"];
+PARICall[session, "factor", 360]
 ```
 
 ```wolfram
-Last[PARICall[session, "polgalois", polynomial]]
+{{2, 3}, {3, 2}, {5, 1}}
 ```
 
-Returns `"S5"`, the symmetric group on five letters.
-
-Count points on an elliptic curve over the field with 101 elements:
-
-```wolfram
-curve = PARICall[session, "ellinit", {0, 0, 0, -1, 0}, 101,
-	"ReturnType" -> "Object"];
-```
+A value without an exact Wolfram Language form stays in GP as a `PARIObject`, which later
+calls can use. Count the points of an elliptic curve over the field with 101 elements:
 
 ```wolfram
+curve = PARICall[session, "ellinit", {0, 0, 0, -1, 0}, 101, "ReturnType" -> "Object"];
 PARICall[session, "ellcard", curve]
 ```
 
-Returns `104`, including the point at infinity.
-
-Compute Fourier coefficients of a weight 2, level 11 newform:
-
 ```wolfram
-form = PARIEvaluate[session, "mfeigenbasis(mfinit([11,2],0))[1]",
-	"ReturnType" -> "Object"];
+104
 ```
-
-```wolfram
-PARICall[session, "mfcoefs", form, 10]
-```
-
-Returns `{0, 1, -2, -1, 2, 1, 2, -2, 0, -2, -2}` (degrees 0 through 10).
 
 Close GP and release its objects:
 
@@ -105,51 +57,34 @@ Close GP and release its objects:
 DeleteObject[session];
 ```
 
-## Values
+## Documentation
 
-| GP result | Wolfram Language result |
+- [Documentation site](https://www.wolframcloud.com/obj/wolframinstitute/PARILink):
+  the guide and every function, with examples.
+- [Paclet page](https://www.wolframcloud.com/obj/wolframinstitute/DeployedResources/Paclet/WolframInstitute/PARILink/index.html):
+  the published resource.
+- [Releases](https://github.com/WolframInstitute/PARILink/releases): the `.paclet` of each
+  version, with checksums and the matching PARI and GMP sources.
+  [CHANGELOG.md](CHANGELOG.md) lists the changes.
+- [Compatibility](docs/compatibility.md): how the link compares with native GP on PARI's
+  own test suites.
+
+## Develop
+
+`make help` lists the commands. `make all` checks the source and runs the tests that need
+no GP; `make test-pari` runs the tests with GP.
+
+| Read | For |
 | --- | --- |
-| Integers, rationals, exact complex numbers, strings | Copied values |
-| Vectors and matrices | Lists |
-| Other values | `PARIObject` |
-
-Use `"ReturnType" -> "Object"` to reuse a GP structure in later calls.
-`Normal[object]` copies a supported retained value. Mutable lists and maps
-remain objects; copy their contents with `Vec` or `Mat`.
-
-## Errors
-
-- GP evaluation errors return `Failure` and leave the session usable.
-- Timeouts, interruptions, and lost connections stop the session.
-
-See [PARICall](docs/en/Symbols/PARICall.md) for time limits and output options.
-
-## Development
-
-To use a source checkout, load its paclet directory before `Needs`:
-
-```wolfram
-PacletDirectoryLoad["/path/to/PARILink/PARILink"];
-```
-
-```bash
-make all
-```
-
-```bash
-make test-pari
-```
-
-Build the bundled runtime for local development:
-
-```bash
-make runtime stage-runtime
-```
-
-Build and publishing instructions: [CONTRIBUTING.md](CONTRIBUTING.md).
-Security reports: [SECURITY.md](SECURITY.md).
+| [CONTRIBUTING.md](CONTRIBUTING.md) | requirements, loading a checkout, tests, runtime builds and releases |
+| [docs/architecture.md](docs/architecture.md) | the design and the choices behind it |
+| [docs/coding-guides/README.md](docs/coding-guides/README.md) | the Wolfram Language coding guides and the style check |
+| [SECURITY.md](SECURITY.md) | reporting a vulnerability, and running GP code safely |
+| [AGENTS.md](AGENTS.md) | instructions for coding agents |
 
 ## License
 
-PARILink code uses the [MIT License](LICENSE). PARI/GP is separately licensed;
-see [third-party notices](THIRD_PARTY_NOTICES.md).
+PARILink is free software under the [GNU General Public License](LICENSE), version 2 or
+any later version, as PARI/GP is. See [COPYRIGHT](COPYRIGHT). Release paclets also contain
+GP, GMP and the PARI data packages under their own licenses; see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

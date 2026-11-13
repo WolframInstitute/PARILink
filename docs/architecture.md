@@ -1,8 +1,8 @@
 # Design
 
-PARILink connects Wolfram Language to PARI/GP. It follows GAPLink's explicit
-sessions, structured function arguments, and session-owned objects. It has no
-dependency on PureMath or GAPLink.
+PARILink connects Wolfram Language to PARI/GP through explicit sessions,
+structured function arguments, and session-owned objects. It depends on no
+project that uses it.
 
 ## Initial choices
 
@@ -41,6 +41,9 @@ without exposing the process protocol to callers.
   separately and can be printed, captured, or discarded. GP errors are
   `Failure` values containing the original error, and leave a synchronized
   session usable. This protocol is not a sandbox for untrusted GP code.
+- Every call gives a value or a `Failure`. A call that matches no form gives
+  `Failure["InvalidArguments", ...]` and the message `Name::args`; see the
+  [coding guides](coding-guides/README.md).
 - Use one project script for checks and tests. PacletPage builds the markdown
   documentation, checks the archive, and provides the publishing entry point.
   Building and publishing are separate actions; builds must remain offline.
@@ -83,13 +86,11 @@ runtimes, evaluates documentation, and builds the paclet with PacletPage. Every
 platform then runs its GP from that exact archive. Release tags require the
 whole CI run to pass and reuse the archive, documentation, and sources.
 
-PureMath can install the released paclet through its existing library dialog;
-runtime discovery, data, and platform packaging remain PARILink's responsibility.
+Projects that use PARILink install the released paclet; runtime discovery,
+data, and platform packaging remain PARILink's responsibility.
 
 ## References
 
 - [PARI/GP manual](https://pari.math.u-bordeaux.fr/doc.html)
 - [GP error handling](https://pari.math.u-bordeaux.fr/dochtml/html/Programming_in_GP__control_statements.html#iferr)
-- [GAPLink design](../../GAPLink/docs/architecture.md)
-- [PureMath's external libraries](../../PureMath/docs/research/ExternalLibraries/ExternalMathematicsLibraries.md)
 - [PacletPage](https://github.com/WolframInstitute/PacletPage)

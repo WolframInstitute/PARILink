@@ -28,6 +28,8 @@ RelatedGuides: [PARILink]
 - `DeleteObject[object]` releases a retained value. Closing the session releases
   all its values. Released objects cannot be used again.
 - Objects cannot be passed to another session or Wolfram kernel.
+- A property request that is not one string, such as `object[1]`, returns
+  `Failure["InvalidArguments", ...]` with the message `PARIObject::args`.
 - `Normal` and `"String"` requests use a 30-second limit. Use `PARICall` with
   an explicit `TimeConstraint` for a computation that needs a different limit.
 

@@ -1,0 +1,21 @@
+#!/bin/sh
+# Lint staged Wolfram Language files with CodeInspector and check them against the coding guides,
+# with the same entry point that CI uses.
+
+files=$(git diff --cached --name-only --diff-filter=ACMR -- '*.wl' '*.wls' '*.wlt' '*.m')
+[ -z "$files" ] && exit 0
+
+if ! command -v wolframscript >/dev/null 2>&1; then
+    echo "pre-commit: wolframscript not found; skipping local lint (CI will run it)." >&2
+    exit 0
+fi
+
+set --
+while IFS= read -r file; do
+    set -- "$@" "$file"
+done <<FILES
+$files
+FILES
+
+echo "pre-commit: linting $# staged Wolfram Language file(s)..."
+exec wolframscript -file scripts/project.wls lint "$@"

@@ -29,7 +29,8 @@ RelatedGuides: [PARILink]
   Use a larger value for memory-intensive work.
 - Startup ignores `.gprc`, disables terminal colors, and disables GP's break loop.
 - Close a session with `DeleteObject[session]` to release its process and objects.
-- Startup and option errors return a `Failure`.
+- Startup and option errors return a `Failure`. Arguments that are not options return
+  `Failure["InvalidArguments", ...]` with the message `StartPARISession::args`.
 
 ## Basic Examples
 

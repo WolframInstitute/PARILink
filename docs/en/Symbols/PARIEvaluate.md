@@ -25,6 +25,8 @@ RelatedGuides: [PARILink]
 - A GP error returns `Failure["PARIError", ...]` with `"PARIError"` and
   `"PARIMessage"` details. The session remains usable after a normal GP error.
 - A timeout or loss of synchronization stops the session and invalidates its objects.
+- Arguments of another form, such as code that is not a string, return
+  `Failure["InvalidArguments", ...]` with the message `PARIEvaluate::args`.
 
 ## Basic Examples
 

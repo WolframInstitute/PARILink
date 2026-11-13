@@ -14,7 +14,7 @@ GP is not needed for `make all` or `make test`. See the
 
 Read [AGENTS.md](AGENTS.md) and [the design](docs/architecture.md) before editing.
 
-- Keep PARILink independent of PureMath and other consumers.
+- Keep PARILink independent of the projects that use it.
 - Loading the paclet must not start GP, install software, or access the network.
 - Keep process and protocol details in `PARILink/Kernel/Internal/`.
 - Preserve exact values and retain values without a lossless mapping in GP.
@@ -23,6 +23,13 @@ Read [AGENTS.md](AGENTS.md) and [the design](docs/architecture.md) before editin
 - Keep GP integration tests separate from tests that need no GP.
 
 ## Development
+
+To use a source checkout, load its paclet directory before `Needs`:
+
+```wolfram
+PacletDirectoryLoad["/path/to/PARILink/PARILink"];
+Needs["WolframInstitute`PARILink`"];
+```
 
 ```bash
 make check
@@ -40,7 +47,12 @@ PARILINK_GP=/path/to/gp make test-pari
 
 Tests in `PARILink/Tests/` need no GP. Tests in `Tests/Integration/` use a real
 executable. Cover successful calls, failures, and process cleanup. Close every
-session created by tests and examples.
+session created by tests and examples. `tests/` holds the tests of the
+development scripts and the programs that CI runs. To run some test files only:
+
+```bash
+make test FILES="PARILink/Tests/Values.wlt tests/Project.wlt"
+```
 
 `make test-upstream` compares expressions from a local PARI source release with
 native GP. It needs Python 3 and a matching GP executable; the
@@ -48,8 +60,23 @@ native GP. It needs Python 3 and a matching GP executable; the
 
 ## Style
 
+Wolfram Language code follows the [coding guides](docs/coding-guides/README.md):
+the kernel, the tests, the scripts, and the programs under `tests/`. The page
+says how PARILink applies them. `make check`, the pre-commit hook, and CI run the
+same check:
+
+```bash
+make style
+make style FILES="PARILink/Kernel/Session.wl"
+make style-fix FILES="PARILink/Kernel/Session.wl"
+make lint FILES="PARILink/Kernel/Session.wl"
+```
+
+`make style-fix` rewrites what a program can decide, such as indentation and
+spacing. Read the code once more for what the check cannot judge, such as names.
+
 - Use UTF-8, LF line endings, tabs in Wolfram Language, and two spaces in GP.
-- Use short usage messages, comments, and error descriptions.
+- Use plain prose in comments and error descriptions.
 - Add a usage message, tests, a reference page, and a guide entry for each public symbol.
 - Give each test a clear `TestID`.
 - Give each README command its own code block, with expected results in the surrounding prose.
@@ -57,7 +84,8 @@ native GP. It needs Python 3 and a matching GP executable; the
 
 ## Git
 
-Enable the commit-message hook:
+Enable the hooks. The commit-message hook checks the subject; the pre-commit
+hook lints the staged Wolfram Language files:
 
 ```bash
 make hooks
@@ -135,9 +163,35 @@ intermediate pages. Cache hits skip GP compilation and dependency fetches.
 Checks, tests, and the build share one main kernel per GP version; archive
 checks keep their isolated kernels. Tests always run, including on cache hits.
 
-The Wolfram jobs need an on-demand license entitlement. PacletPage's child
-kernels use `wolframscript` to obtain their licenses, as in Ruliology. Store
-the entitlement as an Actions secret:
+The Wolfram jobs take their license from one of two secrets: a license line or
+an entitlement. When both are set, they use the license line.
+
+`WOLFRAM_MATHPASS_B64` holds a license line (mathpass) for one machine. With it
+the kernel runs offline and spends no Service Credits. The line has four parts
+with tabs between them: machine name, MathID, activation key, and password.
+Keep it in `.mathpass`, which git ignores, and store it base64-encoded, so that
+the tabs survive:
+
+```bash
+base64 < .mathpass | tr -d '\n' | gh secret set WOLFRAM_MATHPASS_B64 --repo WolframInstitute/PARILink
+```
+
+The kernel knows a machine by its MathID. In a Linux container the MathID comes
+from the machine-id and the host name, so CI fixes both.
+`.github/actions/wolfram-license` sets the machine-id. The host name is the
+machine name at the start of the license line: the `Wolfram license` job reads
+it with `scripts/license-machine-name.sh`, and the Wolfram jobs start their
+containers under that name. Changing either changes the MathID, and the line
+then needs a new password. To get a line for a new machine, leave the secret
+unset, so that the container is named `parilink-ci`, and start CI with
+`gh workflow run ci.yml --ref main`. The step *Verify Wolfram Engine license*
+prints the machine name and the MathID of the container, also when no license
+works. Have a password issued for that MathID and your activation key. The same
+step prints the license type and its expiry in every run.
+
+Without a license line the jobs use an on-demand license entitlement. PacletPage's
+child kernels then use `wolframscript` to obtain their licenses. Store the
+entitlement as an Actions secret:
 
 ```bash
 gh secret set WOLFRAMSCRIPT_ENTITLEMENTID --repo WolframInstitute/PARILink
@@ -154,7 +208,8 @@ Before merging one, run the full CI on a reviewed branch in this repository.
 Manual CI runs validate and build; they cannot publish.
 
 Protect `main` by requiring pull requests and the `Commit messages`,
-`Repository checks`, `Paclet (GP 2.17.4)`, and `Paclet (GP 2.19.0)` checks.
+`Repository checks`, `Wolfram license`, `Paclet (GP 2.17.4)`, and
+`Paclet (GP 2.19.0)` checks.
 Also require every `GP runtime` and `Packaged GP` matrix check.
 Use squash merges with the pull request title as the commit subject.
 
@@ -171,7 +226,8 @@ hashes before deployment. The GitHub release receives the same `.paclet` and
 the corresponding runtime sources, and SHA-256 checksums after the published
 site's checks pass. Source archives and licenses also travel inside the paclet.
 
-Publishing also needs these Actions secrets. Use the publishing account's
+Publishing uses the same license secret as CI, and also needs these Actions
+secrets. Use the publishing account's
 full Wolfram ID for `WOLFRAM_CLOUD_USER`; each command prompts for its value:
 
 ```bash

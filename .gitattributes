@@ -1,0 +1,3 @@
+# The coding guides are kept as received, with their own whitespace.
+docs/coding-guides/WOLFRAM*.md -whitespace
+docs/coding-guides/MANIPULATEFUNCTIONCREATION.md -whitespace

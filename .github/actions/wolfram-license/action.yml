@@ -1,0 +1,78 @@
+name: Verify Wolfram Engine license
+description: >-
+  Licenses the kernel of the job container and starts it once, so that a missing or refused
+  license fails here with a message. With a license line (mathpass) it installs that line;
+  otherwise the kernel uses the on-demand entitlement in WOLFRAMSCRIPT_ENTITLEMENTID. Either
+  way it prints the machine name and the MathID of the container, which a license line is
+  issued for.
+
+inputs:
+  mathpass:
+    description: >-
+      A license line (mathpass) for the job container, base64-encoded so that its tabs survive.
+      Empty means the on-demand entitlement.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Install the license and start a kernel
+      shell: bash
+      env:
+        WOLFRAM_MATHPASS_B64: ${{ inputs.mathpass }}
+        # A license line is for one machine, which the kernel knows by its MathID. In a Linux
+        # container the MathID comes from the machine-id and the host name, so both are fixed:
+        # the machine-id here, and the host name by the workflow, which names the container
+        # after the machine name at the start of the license line. Changing either changes the
+        # MathID, and the license line then needs a new password.
+        WOLFRAM_MACHINE_ID: d488304148cea918bb642ebe9924d65d
+      run: |
+        # Without a license the kernel names the machine in its activation prompt, which it
+        # prints only to a terminal. The empty lines answer the prompt's questions.
+        show_identity() {
+          prompt="$(printf '\n\n\n\n' | timeout 60 script -qec WolframKernel /dev/null 2>&1 | tr -d '\r' || true)"
+          echo "Machine identity of this container, for a license line:"
+          if ! printf '%s\n' "$prompt" | grep -oE '(Machine name|MathID):[[:space:]]*[^[:space:]]+'; then
+            echo "The kernel did not print it. Its output was:"
+            printf '%s\n' "$prompt" | head -n 25
+          fi
+        }
+
+        printf '%s\n' "$WOLFRAM_MACHINE_ID" > /etc/machine-id
+        mkdir -p /var/lib/dbus
+        cp /etc/machine-id /var/lib/dbus/machine-id
+
+        if [ -n "$WOLFRAM_MATHPASS_B64" ]; then
+          expected_name="$("$GITHUB_WORKSPACE/scripts/license-machine-name.sh")" || {
+            echo "::error title=Wolfram license::WOLFRAM_MATHPASS_B64 is not the base64 text of a license line; see CONTRIBUTING.md, \"Continuous integration\"."
+            exit 1
+          }
+          container_name="$(uname -n)"
+          if [ "$container_name" != "$expected_name" ]; then
+            echo "::error title=Wolfram license::The job container is named $container_name, but the license line is for $expected_name. The job must start its container with the host name that the license job reads from the license line."
+            exit 1
+          fi
+          installation="$(ls -d /usr/local/Wolfram/*/*/ 2>/dev/null | head -n 1 || true)"
+          if [ -z "$installation" ]; then
+            echo "::error title=Wolfram license::No Wolfram installation under /usr/local/Wolfram to put the license line in."
+            exit 1
+          fi
+          mkdir -p "${installation}Configuration/Licensing"
+          printf '%s' "$WOLFRAM_MATHPASS_B64" | base64 -d > "${installation}Configuration/Licensing/mathpass"
+          echo "License: license line in ${installation}Configuration/Licensing"
+        elif [ -n "${WOLFRAMSCRIPT_ENTITLEMENTID:-}" ]; then
+          echo "License: on-demand entitlement"
+        else
+          echo "::error title=Missing Wolfram license::Neither WOLFRAM_MATHPASS_B64 nor WOLFRAMSCRIPT_ENTITLEMENTID is set. Add one as a repository secret; see CONTRIBUTING.md, \"Continuous integration\"."
+          show_identity
+          exit 1
+        fi
+
+        # Wolfram symbols must reach the kernel literally.
+        # shellcheck disable=SC2016
+        if ! wolframscript -code 'Print["Wolfram Engine ", $Version, " | license type: ", $LicenseType, " | expires: ", $LicenseExpirationDate, " | machine name: ", $MachineName, " | MathID: ", $MachineID]'; then
+          echo "::error title=Wolfram license refused::The kernel did not start. With a license line, check that it is in date and issued for the machine name and MathID printed below. With an entitlement, check its expiry, its kernel limits and the account's Service Credits."
+          show_identity
+          exit 1
+        fi

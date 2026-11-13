@@ -27,6 +27,8 @@ RelatedGuides: [PARILink]
 - Timeouts, interruptions, process exits, and malformed responses stop a session.
   Start a new session to continue after one of these failures.
 - A normal GP evaluation error leaves the session usable.
+- A property request that is not one string, such as `session[1]`, returns
+  `Failure["InvalidArguments", ...]` with the message `PARISession::args`.
 
 ## Basic Examples
 
