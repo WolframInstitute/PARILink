@@ -1,0 +1,64 @@
+name: Commits
+
+# Commit subjects and pull request titles are checked here, apart from CI, so that this check
+# runs for every change, and an edited title is checked again without a new build.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: commits-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  commits:
+    name: Commit messages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check commit subjects and the pull request title
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          status=0
+          check() {
+            printf '%s\n' "$2" > "$RUNNER_TEMP/message"
+            if ! .githooks/commit-msg "$RUNNER_TEMP/message"; then
+              echo "::error title=Commit convention::$1 must use type(scope): description, at most 72 characters."
+              status=1
+            fi
+          }
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            check 'Pull request title' "$TITLE"
+          fi
+          revisions=("$HEAD")
+          if [ -n "$BASE" ] && [ "$BASE" != 0000000000000000000000000000000000000000 ]; then
+            revisions+=("^$BASE")
+          fi
+          # The check began with ci.yml; keep the history from before it intact.
+          policy=$(git log --diff-filter=A --format=%H -- .github/workflows/ci.yml | tail -1)
+          if git rev-parse --verify "$policy^" >/dev/null 2>&1; then
+            revisions+=("^$policy^")
+          fi
+          git log --format='%H %s' "${revisions[@]}" > "$RUNNER_TEMP/commits"
+          while IFS= read -r line; do
+            check "Commit ${line%% *}" "${line#* }"
+          done < "$RUNNER_TEMP/commits"
+          exit "$status"

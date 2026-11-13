@@ -103,10 +103,12 @@ Each commit should cover one coherent change; include its regression tests when
 behavior changes. Keep independent setup, documentation, and build changes in
 separate commits.
 
-`make all` enables the hook and tests it. CI uses the same validator for new
-commits and pull request titles, including Dependabot changes. Existing history
-from before the CI policy is exempt. Squash merges should use the checked pull
-request title; resolve `fixup!` and `squash!` commits before merging.
+`make all` enables the hook and tests it. The
+[Commits](.github/workflows/commits.yml) workflow uses the same validator for
+new commits and pull request titles, including Dependabot changes, and checks a
+title again when it is edited. Existing history from before the CI policy is
+exempt. Squash merges should use the checked pull request title; resolve
+`fixup!` and `squash!` commits before merging.
 
 ## Documentation and builds
 
@@ -148,8 +150,8 @@ make ci-build
 
 ## Continuous integration
 
-[CI](.github/workflows/ci.yml) checks commit messages and repository hygiene on
-pushes to `main` and pull requests. The Wolfram Engine 15.0 jobs run source
+[CI](.github/workflows/ci.yml) checks repository hygiene on pushes to `main` and
+pull requests into `main`. The Wolfram Engine 15.0 jobs run source
 checks and both test suites with GP 2.17.4 and bundled GP 2.19.0 on Linux.
 Native jobs build GP for Windows x86-64, macOS Intel and ARM64, and Linux x86-64
 and ARM64. A single PacletPage build contains all five runtimes and one copy
@@ -157,6 +159,13 @@ of the data. Each platform tests GP and the bridge from that final archive.
 The Linux Wolfram job also installs the archive, tests permission repair, and
 runs the integration suite with the executable search path empty.
 Plot viewers are disabled throughout CI.
+
+CI does not run for a change only to files it never reads, such as `README.md`
+and `CHANGELOG.md`; `paths-ignore` in `ci.yml` lists them. To skip CI for
+another push, write `[skip ci]` in the body of its last commit, but not in a
+release commit: a release needs CI's build of its own commit. Start a full run
+by hand with `gh workflow run ci.yml --ref main`. CI keeps its build artifacts
+for seven days.
 
 CI caches compiled GP executables, pinned documentation tools, and PacletPage's
 intermediate pages. Cache hits skip GP compilation and dependency fetches.
@@ -212,6 +221,8 @@ Protect `main` by requiring pull requests and the `Commit messages`,
 `Paclet (GP 2.19.0)` checks.
 Also require every `GP runtime` and `Packaged GP` matrix check.
 Use squash merges with the pull request title as the commit subject.
+A pull request that changes only files CI never reads gets no CI run, so its
+required CI checks stay pending; an administrator can still merge it.
 
 ## Releases
 
@@ -243,8 +254,8 @@ gh secret set WOLFRAM_CLOUD_PASSWORD --repo WolframInstitute/PARILink
 
 Before tagging, update the paclet version, move the changelog entries into that
 release, and run `make all`, `make test-pari`, and `make deps build`. Push the
-release commit to `main` and wait for CI. Then create and push an annotated tag,
-using the version in `PacletInfo.wl`:
+release commit to `main` and wait for CI. Then create and push an annotated tag
+on that commit, using the version in `PacletInfo.wl`:
 
 ```bash
 git tag -a v0.1.0 -m "Release v0.1.0"
@@ -257,8 +268,8 @@ git push origin v0.1.0
 `make publish` is the workflow's entry point. It refuses local runs, branch
 runs, mismatched tags, and modified checkouts. To retry
 a failed release, rerun the original tag workflow; do not move an existing tag.
-Build artifacts are retained for 30 days. If one has expired, rerun the original
-`main` push CI run before retrying the release.
+CI keeps its build artifacts for seven days. If they have expired, rerun the
+original `main` push CI run before retrying the release.
 PacletPage refuses to replace a published version from a different commit.
 
 Local builds contain the current platform's runtime. Release builds require

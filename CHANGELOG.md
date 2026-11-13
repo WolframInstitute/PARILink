@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Run CI only for pushes to `main` and pull requests into `main` that change a file CI
+  reads: a change only to `README.md` or `CHANGELOG.md`, for example, starts no run. CI
+  keeps its build artifacts for seven days.
+- Check commit subjects and pull request titles in a workflow of their own, so that
+  editing a pull request no longer runs the whole CI again.
+
 ## 0.3.1 - 2026-11-13
 
 ### Fixed

@@ -3,8 +3,26 @@ name: CI
 on:
   push:
     branches: [main]
+    # CI never reads these files, so a change to them alone starts no run. Keep the list the
+    # same under push and pull_request.
+    paths-ignore:
+      - AGENTS.md
+      - CHANGELOG.md
+      - CONTRIBUTING.md
+      - README.md
+      - SECURITY.md
+      - docs/architecture.md
+      - docs/compatibility.md
   pull_request:
-    types: [opened, synchronize, reopened, edited, ready_for_review]
+    branches: [main]
+    paths-ignore:
+      - AGENTS.md
+      - CHANGELOG.md
+      - CONTRIBUTING.md
+      - README.md
+      - SECURITY.md
+      - docs/architecture.md
+      - docs/compatibility.md
   workflow_dispatch:
 
 permissions:
@@ -19,48 +37,6 @@ defaults:
     shell: bash
 
 jobs:
-  commits:
-    name: Commit messages
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Check commit subjects and the pull request title
-        env:
-          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
-          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
-          TITLE: ${{ github.event.pull_request.title }}
-        run: |
-          status=0
-          check() {
-            printf '%s\n' "$2" > "$RUNNER_TEMP/message"
-            if ! .githooks/commit-msg "$RUNNER_TEMP/message"; then
-              echo "::error title=Commit convention::$1 must use type(scope): description, at most 72 characters."
-              status=1
-            fi
-          }
-          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
-            check 'Pull request title' "$TITLE"
-          fi
-          revisions=("$HEAD")
-          if [ -n "$BASE" ] && [ "$BASE" != 0000000000000000000000000000000000000000 ]; then
-            revisions+=("^$BASE")
-          fi
-          # Keep history from before this policy was introduced intact.
-          policy=$(git log --diff-filter=A --format=%H -- .github/workflows/ci.yml | tail -1)
-          if git rev-parse --verify "$policy^" >/dev/null 2>&1; then
-            revisions+=("^$policy^")
-          fi
-          git log --format='%H %s' "${revisions[@]}" > "$RUNNER_TEMP/commits"
-          while IFS= read -r line; do
-            check "Commit ${line%% *}" "${line#* }"
-          done < "$RUNNER_TEMP/commits"
-          exit "$status"
-
   repository:
     name: Repository checks
     runs-on: ubuntu-24.04
@@ -154,6 +130,7 @@ jobs:
         with:
           name: PARILink-build-logs-${{ matrix.system }}
           path: build/runtimes/${{ matrix.system }}/*.log
+          retention-days: 7
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -161,6 +138,7 @@ jobs:
           path: build/runtimes/${{ matrix.system }}/*.tar.gz*
           if-no-files-found: error
           compression-level: 0
+          retention-days: 7
 
   data:
     name: PARI sources and data
@@ -189,11 +167,12 @@ jobs:
             build/runtime-sources/*.tgz
           if-no-files-found: error
           compression-level: 0
+          retention-days: 7
 
   paclet:
     name: Paclet (GP ${{ matrix.gp }})
-    needs: [commits, repository, license, runtime, data]
-    # Forks have no license secrets; their repository and commit checks still run.
+    needs: [repository, license, runtime, data]
+    # Forks have no license secrets; their repository checks still run.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -318,7 +297,7 @@ jobs:
           path: build/release/*
           if-no-files-found: error
           compression-level: 0
-          retention-days: 30
+          retention-days: 7
 
   installed-runtime:
     name: Packaged GP (${{ matrix.system }})
