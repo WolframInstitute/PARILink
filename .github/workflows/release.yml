@@ -44,14 +44,11 @@ jobs:
             echo '::error title=Release commit::Release tags must point to a commit on main.'
             exit 1
           }
-          commit=$(git rev-parse HEAD)
-          run=$(gh run list --workflow ci.yml --branch main --commit "$commit" \
-            --limit 20 --json databaseId,event \
-            --jq '[.[] | select(.event == "push" or .event == "workflow_dispatch")][0].databaseId')
-          if [ -z "$run" ]; then
+          # GitHub can list a CI run late, so the script looks for about five minutes.
+          run=$(scripts/find-ci-run.sh "$(git rev-parse HEAD)") || {
             echo '::error title=Missing CI run::Run CI on main for the release commit before publishing.'
             exit 1
-          fi
+          }
           gh run watch "$run" --exit-status --interval 30
           test "$(gh run view "$run" --json conclusion --jq .conclusion)" = success
           echo "run=$run" >> "$GITHUB_OUTPUT"

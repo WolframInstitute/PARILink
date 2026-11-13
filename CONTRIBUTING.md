@@ -219,12 +219,15 @@ Use squash merges with the pull request title as the commit subject.
 either when pushed or when the workflow is started manually on that tag.
 The tag must match `PARILink/PacletInfo.wl` and point to a commit on `main`.
 It finds the `main` CI run for that exact commit and waits for it to pass, then
-publishes its verified archive and documentation through PacletPage. No tests,
-GP compilation, or documentation builds are repeated during release.
+publishes its verified archive and documentation through PacletPage. GitHub can
+list a run late, so `scripts/find-ci-run.sh` looks for it for about five minutes.
+No tests, GP compilation, or documentation builds are repeated during release.
 PacletPage checks the archive and source
 hashes before deployment. The GitHub release receives the same `.paclet` and
 the corresponding runtime sources, and SHA-256 checksums after the published
-site's checks pass. Source archives and licenses also travel inside the paclet.
+site's checks pass. The cloud renders new pages late, so a failed check is tried
+again for up to ten minutes, and the error names each check that still fails.
+Source archives and licenses also travel inside the paclet.
 
 Publishing uses the same license secret as CI, and also needs these Actions
 secrets. Use the publishing account's

@@ -12,6 +12,7 @@ buildFingerprint = PARILink`Scripts`PackageScope`buildFingerprint;
 releaseTag = PARILink`Scripts`PackageScope`releaseTag;
 gitCommand = PARILink`Scripts`PackageScope`gitCommand;
 gitText = PARILink`Scripts`PackageScope`gitText;
+siteCheckFailure = PARILink`Scripts`PackageScope`siteCheckFailure;
 withEntitledKernels = PARILink`Scripts`PackageScope`withEntitledKernels;
 
 (* Gives body applied to a new temporary directory and deletes the directory afterwards. *)
@@ -214,6 +215,81 @@ VerificationTest[
 	],
 	{"v0.1.0", "refused", "refused", "refused", "refused", "refused", "v0.1.0"},
 	TestID -> "Release: verify tag, workflow commit, clean checkout, and main ancestry in Git"
+]
+
+(* What PacletPage gives when it has published the resource and the check of the site gives check. *)
+publishedPages[check_Association] :=
+	<|
+		"Resource" -> <|"Deployed" -> True, "Resource" -> "https://example.invalid/obj/resource"|>,
+		"Site" -> <|"Site" -> "https://example.invalid/obj/PARILink"|>,
+		"Check" -> check
+	|>
+
+(* A stand-in for the call of PacletPage: it records the options of the call and gives publishedPages[check]. *)
+pageCallGiving[check_Association] :=
+	Function[Null,
+		Sow[Drop[{##}, 3], "PageCall"];
+		publishedPages[check]
+	]
+
+(* In place of logging an error and stopping the task, a failed requirement gives its message. *)
+refuseWithMessage[parts___] := Throw[StringJoin[Map[ToString, {parts}]], "RefusedStep"]
+
+(* Runs PublishPaclet with the release, the build and the cloud replaced, while PacletPage gives publishedPages[check].
+   It gives the options of the call of PacletPage, and the message of the requirement that failed, or Null. *)
+publishedWithCheck[check_Association] :=
+	Replace[
+		Reap[
+			Block[
+				{
+					CheckRelease = Function[Null, "v0.1.0"],
+					CheckBuild = Function[Null, Null],
+					PARILink`Scripts`PackageScope`environmentSetting = Function[Null, "test"],
+					CloudConnect = Function[Null, Null],
+					$CloudConnected = True,
+					PARILink`Scripts`PackageScope`pageCall = pageCallGiving[check],
+					PARILink`Scripts`PackageScope`failTask = refuseWithMessage,
+					LogInfo = Function[Null, Null]
+				},
+				Catch[PublishPaclet[], "RefusedStep"]
+			],
+			"PageCall"
+		],
+		{outcome_, {{options_List}}} :> {options, outcome}
+	]
+
+(* The cloud renders the pages of a new site some time after they are published. *)
+VerificationTest[
+	Replace[publishedWithCheck[<|"OK" -> True, "Failed" -> {}|>], {options_List, outcome_} :> {Lookup[options, "CheckOptions"], outcome}],
+	{{"Wait" -> 600}, Null},
+	TestID -> "Release: the site check gives a failed check ten minutes to pass"
+]
+
+VerificationTest[
+	Last @ publishedWithCheck[
+		<|
+			"OK" -> False,
+			"Failed" -> {
+				<|"Check" -> "Page ref/PARICall", "URL" -> "https://example.invalid/obj/ref/PARICall.nb", "OK" -> False, "Detail" -> "HTTP 503"|>,
+				<|"Check" -> "Feedback Me", "URL" -> "https://example.invalid/obj/Feedback/Me", "OK" -> False, "Detail" -> "not readable anonymously"|>
+			}
+		|>
+	],
+	StringRiffle[
+		{
+			"The published documentation site did not pass its checks:",
+			"Page ref/PARICall: HTTP 503 (https://example.invalid/obj/ref/PARICall.nb)",
+			"Feedback Me: not readable anonymously (https://example.invalid/obj/Feedback/Me)"
+		},
+		"\n"
+	],
+	TestID -> "Release: a site that fails its checks stops the release, and the error names each failed check"
+]
+
+VerificationTest[
+	{siteCheckFailure[<|"OK" -> False|>], siteCheckFailure[None]},
+	ConstantArray["The published documentation site did not pass its checks", 2],
+	TestID -> "Release: the site check error reads the same without details"
 ]
 
 (* What RunProcess or StartProcess was asked to start, in place of starting a wolframscript command: the command, the

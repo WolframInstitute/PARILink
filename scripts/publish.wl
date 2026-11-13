@@ -8,7 +8,7 @@ PackageExported[{CheckRelease, PublishPaclet}];
 (* ::Section:: *)
 (*PackageScoped*)
 
-PackageScoped[{releaseTag, gitCommand, gitText}];
+PackageScoped[{releaseTag, gitCommand, gitText, siteCheckFailure}];
 
 (* ::Section:: *)
 (*Usage Messages*)
@@ -27,6 +27,11 @@ releaseTag::usage = "releaseTag[environment, version] gives the tag of the relea
 stops the current task when the workflow is not one or its tag does not match the version.";
 gitCommand::usage = "gitCommand[arguments] runs git in the repository with the given string arguments and gives the result of RunProcess.";
 gitText::usage = "gitText[arguments] gives the output of the git command with the given string arguments, and stops the current task when git fails.";
+$siteCheckWait::usage = "$siteCheckWait is the number of seconds that the check of the published site gives a failed check to pass. The cloud \
+renders the pages of a site some time after they are published.";
+failedCheckLine::usage = "failedCheckLine[result] gives the line that describes the failed check result: its name, the reason and the URL.";
+siteCheckFailure::usage = "siteCheckFailure[check] gives the error for a published site that did not pass its checks, with a line for each check \
+that failed in check, the association that the site check of PacletPage gives.";
 
 (* ::Section:: *)
 (*Function Definitions*)
@@ -80,6 +85,25 @@ CheckRelease[environment_Association] :=
 CheckRelease[] := CheckRelease[Association[GetEnvironment[]]]
 CheckRelease[___] := invalidArgumentsFailure[CheckRelease]
 
+$siteCheckWait = 600;
+
+failedCheckLine[checkResult_Association] :=
+	StringJoin[
+		TextString[Lookup[checkResult, "Check", "A check"]],
+		": ",
+		TextString[Lookup[checkResult, "Detail", "failed"]],
+		" (",
+		TextString[Lookup[checkResult, "URL", "no URL"]],
+		")"
+	]
+
+siteCheckFailure[check_Association] :=
+	Module[{lines},
+		lines = Map[failedCheckLine, Cases[Lookup[check, "Failed", {}], _Association]];
+		StringRiffle[Prepend[lines, "The published documentation site did not pass its checks" <> If[lines === {}, "", ":"]], "\n"]
+	]
+siteCheckFailure[___] := "The published documentation site did not pass its checks"
+
 (* CloudConnect can print a message and still connect, so its messages go to the log and only the connection is
    required. *)
 PublishPaclet[] :=
@@ -95,11 +119,12 @@ PublishPaclet[] :=
 			"Account" -> account,
 			"Build" -> False,
 			"ResourceOptions" -> {"Build" -> False, "Parallel" -> False},
+			"CheckOptions" -> {"Wait" -> $siteCheckWait},
 			"Monitor" -> True
 		];
 		RequireOrLog[result, AssociationQ, "PacletPage publication failed"];
 		RequireOrLog[result["Resource"]["Deployed"], TrueQ, "PacletPage publication failed"];
-		RequireOrLog[result["Check"]["OK"], TrueQ, "The published documentation site did not pass its checks"];
+		RequireOrLog[result["Check"]["OK"], TrueQ, siteCheckFailure[result["Check"]]];
 		LogInfo["OK: published ", result["Resource"]["Resource"]];
 		LogInfo[result["Site"]["Site"]]
 	]

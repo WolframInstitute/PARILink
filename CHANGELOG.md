@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Let a release find its CI run when GitHub lists the run late: the release looks for it
+  every 30 seconds for up to five minutes.
+- Give a failed check of the published site ten minutes to pass, as the cloud renders new
+  pages late, and name each check that still fails, with its reason and URL.
+
 ## 0.3.0 - 2026-11-13
 
 ### Changed
